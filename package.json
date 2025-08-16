@@ -1,0 +1,65 @@
+{
+  "name": "agented-io",
+  "version": "1.0.9",
+  "description": "AI Agent Framework for building intelligent agents with LLM integration, function calling, and reflection capabilities",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc && npm run copy-prompts",
+    "build:watch": "tsc --watch",
+    "copy-prompts": "cp -r prompts dist/",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:package": "ts-node test-package.ts"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "artificial-intelligence",
+    "function-calling",
+    "reflection",
+    "typescript",
+    "openai",
+    "anthropic",
+    "deepseek"
+  ],
+  "author": "Filipp Antonov",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/agented.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/agented.io/issues"
+  },
+  "homepage": "https://github.com/yourusername/agented.io#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.0.0",
+    "@anthropic-ai/sdk": "^0.33.1",
+    "openai": "^4.77.0",
+    "jsonrepair": "^3.11.2",
+    "node-schedule": "^2.1.1",
+    "axios": "^1.7.9",
+    "vm2": "^3.9.19",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^18.0.0",
+    "@types/node-schedule": "^2.1.8",
+    "jest": "^29.0.0",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  }
+}

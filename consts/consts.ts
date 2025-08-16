@@ -1,0 +1,1 @@
+export const IS_USE_SCHEDULED_REFLECTION = process.env.IS_USE_SCHEDULED_REFLECTION === 'true';
