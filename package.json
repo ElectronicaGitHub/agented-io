@@ -34,12 +34,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/agented.io.git"
+    "url": "https://github.com/ElectronicaGitHub/agented-io"
   },
-  "bugs": {
-    "url": "https://github.com/yourusername/agented.io/issues"
-  },
-  "homepage": "https://github.com/yourusername/agented.io#readme",
+  "homepage": "https://github.com/ElectronicaGitHub/agented-io",
   "engines": {
     "node": ">=16.0.0"
   },

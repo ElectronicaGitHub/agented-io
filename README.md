@@ -78,24 +78,6 @@ private async initializeAgent() {
     console.error('Error initializing agent:', error);
   }
 }
-
-// Setup agent event listeners
-private setupAgentEventHandlers(agent: any) {
-  // Listen to agent messages
-  agent.on('message', (message: string) => {
-    console.log('Agent message:', message);
-  });
-  
-  // Listen to function calls
-  agent.on('functionCall', (functionName: string, args: any) => {
-    console.log('Function called:', functionName, args);
-  });
-  
-  // Listen to completion events
-  agent.on('complete', (result: any) => {
-    console.log('Agent completed:', result);
-  });
-}
 ```
 
 ## Function Definitions
