@@ -471,11 +471,13 @@ class Agent {
             [consts_1.MIXINS_RESULT_FIELD_PROMPT_PLACEHOLDER]: mixinsResult || '',
             [consts_1.CHILDREN_STATUS_FIELD_PROMPT_PLACEHOLDER]: childrenStatusInfo,
         });
+        console.log('promptWithContext', promptWithContext);
         const dynamicPrompt = promptWithContext.split(consts_1.DYNAMIC_PROMPT_SEPARATOR);
         this.splitPrompt = {
             cacheable: dynamicPrompt[0],
             nonCacheable: dynamicPrompt[1],
         };
+        console.log('this.splitPrompt', this.splitPrompt);
         return promptWithContext;
     }
     contextPolyfill(item) {
