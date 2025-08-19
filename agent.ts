@@ -589,13 +589,11 @@ export class Agent implements IAgent {
       [CHILDREN_STATUS_FIELD_PROMPT_PLACEHOLDER]: childrenStatusInfo,
     });
 
-    console.log('promptWithContext', promptWithContext);
     const dynamicPrompt = promptWithContext.split(DYNAMIC_PROMPT_SEPARATOR);
     this.splitPrompt = {
       cacheable: dynamicPrompt[0],
       nonCacheable: dynamicPrompt[1],
     }
-    console.log('this.splitPrompt', this.splitPrompt);
 
     return promptWithContext;
   }
