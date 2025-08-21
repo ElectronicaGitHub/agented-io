@@ -1,7 +1,6 @@
 export const OPENAI_MODEL = 'gpt-4o';
 // export const OPENAI_MODEL = 'gpt-4o-mini';
-export const ANTHROPIC_MODEL = 'claude-3-5-sonnet-latest';
-// export const ANTHROPIC_MODEL = 'claude-3-5-sonnet-20240620';
+export const ANTHROPIC_MODEL = (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514') as string;
 export const DEEPSEEK_MODEL = 'deepseek-chat';
 
 export const ANTHROPIC_MAX_RETRIES = 3;
