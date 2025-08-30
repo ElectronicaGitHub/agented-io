@@ -314,9 +314,7 @@ export class Agent implements IAgent {
     this.mainAgent?.addAgent(agent);
 
     // Agent listens main agent response -> react to main agent response, with own process
-    agent.on(EAgentEvent.MAIN_RESPONSE, (result: IAgentMessage) => {
-      console.log(`-------> [Agent ${this.name}] MAIN_RESPONSE: ${JSON.stringify(result)}`);
-      
+    agent.on(EAgentEvent.MAIN_RESPONSE, (result: IAgentMessage) => {  
       // Check if this response should be batched
       if (!this.handleChildrenPendingResponses(result, agent.name)) {
         this.process(result.text, agent.name);
@@ -325,13 +323,11 @@ export class Agent implements IAgent {
 
     // Agent listens it's reflection response -> react to reflection response, with own process
     agent.on(EAgentEvent.REFLECTION_RESPONSE, (result: IAgentMessage) => {
-      // console.log(`-------> [Agent ${this.name}] REFLECTION_RESPONSE: ${JSON.stringify(result)}`);
       this.process(result.text, result.sender);
     });
 
     // Agent listens children response
     agent.on(EAgentEvent.RESPONSE, (response: IAgentMessage) => {
-      console.log(`-------> [Agent ${this.name}] RESPONSE: ${JSON.stringify(response)}`);
       this.emit(EAgentEvent.RESPONSE, response);
     });
 
@@ -345,14 +341,7 @@ export class Agent implements IAgent {
    * @param sender - The name of the agent that created the input
    * @returns A promise that resolves to the result of the processing
    */
-  process(inputText: string, sender: string = 'user', type: EAgentResponseType = EAgentResponseType.TEXT, functionName?: string): void {
-    console.log(`[Agent ${this.name}] Received new task from ${sender}:`, {
-      type,
-      functionName: functionName || 'none',
-      textLength: inputText?.length || 0,
-      currentStatus: this.status
-    });
-    
+  process(inputText: string, sender: string = 'user', type: EAgentResponseType = EAgentResponseType.TEXT, functionName?: string): void {    
     // Clear any existing processing
     this.cleanup();
     
@@ -405,14 +394,7 @@ export class Agent implements IAgent {
   private async processItem(item: IAgentMessage, signal: AbortSignal): Promise<void> {
     try {
       this.setStatus(EAgentStatus.WORKING);
-      
-      console.log('\n\n\n\n');
-      if (item.text) {
-        console.log(`\n----> [Agent ${this.name}] ${this.id} Processing input: item.type: ${item.type} \n\n${item.text}\n\n`);
-      } else {
-        console.log(`\n----> [Agent ${this.name}] ${this.id} Processing empty input`);
-      }
-
+    
       // Initialize ctx with input details
       this.contextPolyfill(item);
 
@@ -421,8 +403,6 @@ export class Agent implements IAgent {
       const mixinsResult = await this.processMixins();
 
       this.addMessages([item]);
-      // console.log(`111 [${this.name}] Added message ${JSON.stringify(item)}`);
-
 
       // HERE WE BUILD SPLIT_PROMPT
       const prompt = await this.preRequestBuildPrompt(
@@ -437,8 +417,6 @@ export class Agent implements IAgent {
 
       while (retryCount < MAX_RETRIES) {
         try {
-          // console.log(`[Agent ${this.name}] Sending prompt to LLM (llmProcessor.getLLMResultSendMessage)`);
-          // console.log(`[Agent ${this.name}] prompt: ${prompt}`);
           const { result, metadata } = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
           
           // Validate response format
@@ -488,25 +466,20 @@ export class Agent implements IAgent {
       }
       
       const { stopProcessing, result, agent } = await this.handleResponse(response);
-      // console.log(`777, typeof result: ${typeof result} \n result: ${JSON.stringify(result, null, 2)}`);
       const event = this.buildResponseEvent(response, result);
 
-      // console.log(`--> [Agent ${this.name}] PARSED RESPONSE: stopProcessing: ${stopProcessing} and result: ${JSON.stringify(result)}`);
 
       if (stopProcessing) {
         /**
          * Here we respond to parent agent back
          */
         if (this.parentAgent && this.agentSchema.type === EAgentType.REFLECTION) {
-          // console.log(`--> [Agent ${this.name}] ENQUEUE reflection agent: ${JSON.stringify(event)}`);
           this.emit(EAgentEvent.REFLECTION_RESPONSE, event);
         } else {
-          // console.log(`--> [Agent ${this.name}] ENQUEUE regular agent: ${JSON.stringify(event)}`);
           this.emit(EAgentEvent.MAIN_RESPONSE, event);
         }
 
         this.addMessages([event]);
-        // console.log(`222 [${this.name}] Added message: ${JSON.stringify(event)}`);
       } else {
         this.emit(EAgentEvent.RESPONSE, event);
         console.log(`[Agent ${this.name}] event.type: ${event.type}`);
@@ -517,7 +490,6 @@ export class Agent implements IAgent {
         const eventTypesWithoutMessages = [EAgentResponseType.FUNCTION, EAgentResponseType.AGENT, EAgentResponseType.MULTIPLE_FUNCTIONS];
         if (event.type && !eventTypesWithoutMessages.includes(event.type)) {
           this.addMessages([event]);
-          // console.log(`333 [${this.name}] Added message: ${JSON.stringify(event)}`);
         }
 
         if (event.commands?.length) {
@@ -609,12 +581,9 @@ export class Agent implements IAgent {
   }
 
   private buildResponseEvent(response: IAgentResponse, result?: IAgentFunctionResult): IAgentMessage {
-    // console.log(`[Agent ${this.name}] ---))))) buildResponseEvent response: ${JSON.stringify(response)} \n Typeof result: ${typeof result} \n Result: ${JSON.stringify(result)}`);
     const isCommandResult = Array.isArray(result);
-    // console.log(`[Agent ${this.name}] ---))))) buildResponseEvent isCommandResult: ${isCommandResult}`);
     const text = isCommandResult ? result[0] : (result || '') as string;
     const commands = isCommandResult ? result[1] : [];
-    // console.log(`[Agent ${this.name}] ---))))) buildResponseEvent commands: ${JSON.stringify(commands)}`);
     
     let functionName = '';
     if (response.type === EAgentResponseType.FUNCTION) {
@@ -650,13 +619,10 @@ export class Agent implements IAgent {
     agent?: IAgent,
   }> {
     let result: IAgentFunctionResult = '';
-
-    // console.log(`[Agent ${this.name}] handleResponse response:\n\ntypeof response: ${typeof response} \n response: ${JSON.stringify(response)}`);
     /**
      * Function response
      */
     if (typeof response === 'string') {
-      console.log('[Agent.parseResponse] STRING response');
       return { stopProcessing: true, result: response, type: EAgentResponseType.TEXT };
     }
 
@@ -664,12 +630,6 @@ export class Agent implements IAgent {
     if (funcRes.type === EAgentResponseType.FUNCTION) {
       console.log(`[Agent ${this.name}] Executing function: ${funcRes.functionName}`);
       result = await this.handleFunctionResponse(funcRes);
-      // console.log(`[Agent ${this.name}] Function executed result -- \nTypeof result: ${typeof result} \n result: ${JSON.stringify(result)}`);
-
-      // const isCommandResult = Array.isArray(result);
-      // const text = isCommandResult ? result[0] : (result as string || '');
-      // const commands = isCommandResult ? result[1] : null;
-      // console.log(`[Agent ${this.name}] Function executed result Commands -- \nText: ${text} \n Typeof commands: ${typeof commands} \n commands: ${JSON.stringify(commands, null, 2)}`);
       
       return { stopProcessing: false, result, type: funcRes.type };
     }
@@ -689,14 +649,10 @@ export class Agent implements IAgent {
      */
     const agentRes = this.returnAsAgentResponse(response);
     if (agentRes.type === EAgentResponseType.AGENT) {
-      console.log(`[Agent ${this.name}] Finished processing, agentRes: ${agentRes.name}`);
-
       const agent = this.children.find(child => child.name === agentRes.name);
-      console.log(`${this.name} this.children: ${JSON.stringify(this.children.map(child => child.name))}`);
 
       // Check if agent is already working
       if (agent && agent.currentStatus === EAgentStatus.WORKING) {
-        console.log(`[Agent ${this.name}] Agent ${agentRes.name} is already working, waiting for response`);
         return { stopProcessing: true, result: `Waiting for response from ${agentRes.name}`, type: agentRes.type };
       }
 
@@ -708,7 +664,6 @@ export class Agent implements IAgent {
      */
     const textRes = this.returnAsTextResponse(response);
     if (textRes.type === EAgentResponseType.TEXT) {
-      console.log(`[Agent ${this.name}] Finished processing, textRes: ${textRes.text}`);
       this.flowLength = 0;
       return { stopProcessing: true, result: textRes.text, type: textRes.type };
     }
@@ -730,7 +685,6 @@ export class Agent implements IAgent {
      * Handling the result from function, is it a string or an a CommandResult
      */
     const resultIsCommand = Array.isArray(result);
-    // console.log(`[Agent ${this.name}] ---))))) handleFunctionResponse resultIsCommand: ${resultIsCommand} \n result: ${JSON.stringify(result)}`);
     
     if (resultIsCommand) {
       const resultWithCommands = this.returnAsCommandResult(result);
@@ -863,36 +817,27 @@ export class Agent implements IAgent {
     return resp as IAgentResponseMultipleFunctions;
   }
 
-  private handleChildrenPendingResponses(result: IAgentMessage, sender: string): boolean {
-    console.log(`[Agent ${this.name}] handleChildrenPendingResponses called with sender: ${sender}`);
-    
+  private handleChildrenPendingResponses(result: IAgentMessage, sender: string): boolean {  
     const senderAgent = this.children.find(child => child.name === sender);
     if (!senderAgent) {
-      console.log(`[Agent ${this.name}] No sender agent found for ${sender}, returning false`);
       return false;
     }
-    console.log(`[Agent ${this.name}] Found sender agent: ${senderAgent.name}`);
 
     // Clear any existing ping interval for this sender since we got their response
     const existingInterval = this.resources.intervals.get(sender);
     if (existingInterval) {
       clearInterval(existingInterval);
       this.resources.intervals.delete(sender);
-      console.log(`[Agent ${this.name}] Cleared ping interval for ${sender} as response was received`);
     }
 
     // Process response after state updates have settled
     setTimeout(() => {
       // Check children statuses
       const childrenStatuses = this.checkChildrenStatuses();
-      console.log(`[Agent ${this.name}] Current children statuses:`, Object.fromEntries(childrenStatuses));
       
       const workingChildren = Array.from(childrenStatuses.entries())
         .filter(([_, status]) => status === EAgentStatus.WORKING)
         .map(([name]) => name);
-
-      console.log(`[Agent ${this.name}] Working children count: ${workingChildren.length}`);
-      console.log(`[Agent ${this.name}] Working children: ${workingChildren.join(', ') || 'none'}`);
 
       // Process current response with context about working children
       let responseText = result.text;
@@ -901,33 +846,27 @@ export class Agent implements IAgent {
         
         // Set up periodic pinging for working children
         workingChildren.forEach(childName => {
-          console.log(`[Agent ${this.name}] Setting up ping interval for child ${childName}`);
           const pingInterval = setInterval(() => {
             const child = this.children.find(c => c.name === childName);
-            console.log(`[Agent ${this.name}] Checking child ${childName} status in ping interval: ${child?.currentStatus}`);
             
             if (!child || child.currentStatus !== EAgentStatus.WORKING) {
-              console.log(`[Agent ${this.name}] Requesting last response from ${childName}`);
               if (child) {
                 child.emit(EAgentEvent.REQUEST_LAST_RESPONSE, {
                   fromAgent: this.name,
                   timestamp: new Date()
                 });
               }
-              console.log(`[Agent ${this.name}] Clearing ping interval for ${childName}`);
               clearInterval(pingInterval);
               this.resources.intervals.delete(childName);
               return;
             }
             
-            console.log(`[Agent ${this.name}] Emitting PING event to ${childName}`);
             child.emit(EAgentEvent.PING, {
               fromAgent: this.name,
               timestamp: new Date()
             });
           }, this.pingIntervalMs);
 
-          console.log(`[Agent ${this.name}] Storing ping interval reference for ${childName}`);
           this.resources.intervals.set(childName, pingInterval);
         });
       }

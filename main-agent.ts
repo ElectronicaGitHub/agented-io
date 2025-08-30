@@ -70,7 +70,6 @@ export class MainAgent implements IMainAgent {
   }
 
   sendMessage(text: string, sender: string = 'user') {
-    console.log(`[MainAgent.sendMessage] text: ${text}, sender: ${sender}`);
     this.textQueue.enqueue({ 
       text, 
       sender, 
@@ -106,7 +105,6 @@ export class MainAgent implements IMainAgent {
     
     // check for overfill PROMPT_LAST_MESSAGES_N
     if (this.messagesMap[key].length > PROMPT_LAST_MESSAGES_N) {
-      console.log(`[MainAgent.addMessages] overfill PROMPT_LAST_MESSAGES_N, ${this.messagesMap[key].length}`);
       this.messagesMap[key] = this.messagesMap[key].slice(-PROMPT_LAST_MESSAGES_N);
     }
     this.emit(EAgentEvent.MESSAGES_UPDATED, { parentId, childId, messages: this.messagesMap[key] });
