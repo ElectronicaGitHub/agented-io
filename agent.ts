@@ -58,7 +58,7 @@ export class Agent implements IAgent {
   children: IAgent[] = [];
   llmProcessor: LLMProcessor;
   flowLength: number = 0;
-  private processQueue: SimpleQueue<IAgentMessage> = new SimpleQueue(this.processItem.bind(this));
+  private processQueue: SimpleQueue<IAgentMessage> = new SimpleQueue((item, signal) => this.processItem(item, signal));
   protected ctx: IAgentCtx = {
     agentId: this.id,
     inputText: '',
@@ -117,7 +117,7 @@ export class Agent implements IAgent {
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
     this.llmProcessor = new LLMProcessor();
-    this.processQueue = new SimpleQueue(this.processItem.bind(this));
+    this.processQueue = new SimpleQueue((item, signal) => this.processItem(item, signal));
     this.parentAgent = parentAgent;
 
     this.listeners = {};
@@ -402,7 +402,7 @@ export class Agent implements IAgent {
    * @param item - The item to process
    * @returns A promise that resolves to the result of the processing
    */
-  private async processItem(item: IAgentMessage): Promise<void> {
+  private async processItem(item: IAgentMessage, signal: AbortSignal): Promise<void> {
     try {
       this.setStatus(EAgentStatus.WORKING);
       
@@ -439,7 +439,7 @@ export class Agent implements IAgent {
         try {
           // console.log(`[Agent ${this.name}] Sending prompt to LLM (llmProcessor.getLLMResultSendMessage)`);
           // console.log(`[Agent ${this.name}] prompt: ${prompt}`);
-          const { result, metadata } = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt);
+          const { result, metadata } = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
           
           // Validate response format
           if (typeof result === 'string') {

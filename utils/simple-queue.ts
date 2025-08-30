@@ -4,7 +4,7 @@ export class SimpleQueue<T> {
   private currentAbortController?: AbortController;
   private currentProcessingItem?: T;
 
-  constructor(private processItem: (item: T) => Promise<any>) {}
+  constructor(private processItem: (item: T, signal: AbortSignal) => Promise<any>) {}
 
   enqueue(item: T) {
     // Cancel current processing if any
@@ -53,7 +53,7 @@ export class SimpleQueue<T> {
     try {
       // Wrap the processItem in a promise that can be aborted
       await Promise.race([
-        this.processItem(item),
+        this.processItem(item, signal),
         new Promise((_, reject) => {
           signal.addEventListener('abort', () => {
             reject(new Error('Processing cancelled'));
@@ -77,4 +77,5 @@ export class SimpleQueue<T> {
       }
     }
   }
-} 
+}
+ 

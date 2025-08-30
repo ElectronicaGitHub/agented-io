@@ -51,7 +51,7 @@ export class LLMProcessor {
     }
   }
 
-  async getLLMResultSendMessage(message: string | ISplitPrompt, allowString: boolean = false): Promise<{
+  async getLLMResultSendMessage(message: string | ISplitPrompt, allowString: boolean = false, signal?: AbortSignal): Promise<{
     result: any;
     metadata: {
       inputTokens: number;
@@ -59,7 +59,7 @@ export class LLMProcessor {
     };
   }> {
     try {
-      const result = await this.tryMultipleProvidersSendMessage(message, this.lastWorkingProvider, allowString);
+      const result = await this.tryMultipleProvidersSendMessage(message, this.lastWorkingProvider, allowString, signal);
       return result;
     } catch (error) {
       console.error('Failed to get LLM result from all providers:', error);
