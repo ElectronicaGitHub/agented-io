@@ -11,6 +11,7 @@ export interface IMainAgent {
   getAgentByTabKey(tabKey: string): IAgent | undefined;
   process(item: IAgentMessage): void;
   init(): void;
+  sendMessage(text: string, role: string): void;
   on(event: EAgentEvent, callback: (data: any) => void): void;
   removeListener(event: EAgentEvent, callback: (data: any) => void): void;
 }

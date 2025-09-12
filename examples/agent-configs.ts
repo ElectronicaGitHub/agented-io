@@ -1,5 +1,5 @@
-import { EAgentType } from "../enums";
-import { IAgentSchema } from "../interfaces";
+import { EAgentType } from '../enums';
+import { IAgentSchema } from '../interfaces';
 
 export function getArbitrageRaydiumMeteoraAgentConfig(): IAgentSchema {
   const mainPrompt = `

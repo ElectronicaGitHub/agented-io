@@ -18,6 +18,8 @@ export interface IAgent {
   currentStatus: EAgentStatus;
   emit(event: string, ...args: any[]): void;
 
+  on(event: string, listener: (...args: any[]) => void): void;
+
   setInitialMessages(messages: IAgentMessage[]): void;
   setCtx(ctx: any): void;
 }

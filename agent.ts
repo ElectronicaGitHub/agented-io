@@ -249,7 +249,7 @@ export class Agent implements IAgent {
   private initializeEventListeners() {
     // Status change listener
     const statusListener = (statusChange: any) => {
-      console.log(`[Agent ${this.name}] Status changed from ${statusChange.previousStatus} to ${statusChange.status}`);
+      // console.log(`[Agent ${this.name}] Status changed from ${statusChange.previousStatus} to ${statusChange.status}`);
     };
     this.on(EAgentEvent.STATUS_CHANGED, statusListener);
 
@@ -907,8 +907,6 @@ export class Agent implements IAgent {
 
     // Clear the process queue
     this.processQueue.clear();
-
-    console.log(`[Agent ${this.name}] Cleanup completed`);
   }
 
   // Add status getter
