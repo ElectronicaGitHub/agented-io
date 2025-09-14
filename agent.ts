@@ -137,6 +137,12 @@ export class Agent implements IAgent {
   }
 
   private async getCombinedPromptWithFunctions(): Promise<string> {
+    // If the agent is configured to start with an empty base prompt,
+    // bypass loading any built-in prompts entirely
+    if (this.agentSchema.options?.emptyBasePrompt) {
+      // Use only schema-level prompts (prompt + flowInstructionPrompt)
+      return this.getSpecialInstructions();
+    }
     let prompt = this.agentSchema.prompt || '';
     // reflection agent
     if (this.agentSchema.type === EAgentType.REFLECTION) {
@@ -562,9 +568,11 @@ export class Agent implements IAgent {
     });
 
     const dynamicPrompt = promptWithContext.split(DYNAMIC_PROMPT_SEPARATOR);
+    const cacheable = dynamicPrompt[0] ?? '';
+    const nonCacheable = dynamicPrompt[1] ?? '';
     this.splitPrompt = {
-      cacheable: dynamicPrompt[0],
-      nonCacheable: dynamicPrompt[1],
+      cacheable,
+      nonCacheable,
     }
 
     return promptWithContext;
