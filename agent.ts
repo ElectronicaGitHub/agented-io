@@ -568,14 +568,8 @@ export class Agent implements IAgent {
     });
 
     const dynamicPrompt = promptWithContext.split(DYNAMIC_PROMPT_SEPARATOR);
-    let cacheable = '';
-    let nonCacheable = '';
-    if (dynamicPrompt.length === 1) {
-      nonCacheable = dynamicPrompt[0] ?? '';
-    } else {
-      cacheable = dynamicPrompt[0] ?? '';
-      nonCacheable = dynamicPrompt[1] ?? '';
-    }
+    const cacheable = dynamicPrompt[0] ?? '';
+    const nonCacheable = dynamicPrompt[1] ?? '';
     this.splitPrompt = {
       cacheable,
       nonCacheable,
