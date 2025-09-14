@@ -36,17 +36,6 @@ export interface IAgentSchema {
   reflections?: IAgentSchema[];
   children?: IAgentSchema[];
   /**
-   * Optional flags to tweak agent behavior
-   */
-  options?: {
-    /**
-     * If true, the agent will start with an empty base prompt and will not load
-     * any built-in decider/reflection prompts. This effectively disables
-     * agent conversation unless explicitly provided via other mechanisms.
-     */
-    emptyBasePrompt?: boolean;
-  };
-  /**
    * This is the cron schedule for the reflection agent
    */
   cronSchedule?: string;
