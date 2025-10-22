@@ -2,22 +2,25 @@ import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs/promises';
 import path from 'path';
 import { TextBlock } from '@anthropic-ai/sdk/resources';
-import { ANTHROPIC_API_KEY, ANTHROPIC_DELAY_MS, ANTHROPIC_MAX_RETRIES, ANTHROPIC_MODEL } from '../consts';
-import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt } from '../interfaces';
+import { ANTHROPIC_DELAY_MS, ANTHROPIC_MAX_RETRIES } from '../consts';
+import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 export class AnthropicConnector implements ISimpleLLMConnector {
   private client: Anthropic;
   private systemPrompt: string | null = null;
   private maxRetries: number = ANTHROPIC_MAX_RETRIES;
   private retryDelay: number = ANTHROPIC_DELAY_MS;
+  private model: string;
 
-  constructor() {
+  constructor(private envConfig: Required<IEnvOptions>) {
     this.client = new Anthropic({
-      apiKey: ANTHROPIC_API_KEY,
+      apiKey: this.envConfig.ANTHROPIC_API_KEY,
     });
+    this.model = this.envConfig.ANTHROPIC_MODEL;
   }
 
-  async sendChatMessage(prompt: string | ISplitPrompt, model: string = ANTHROPIC_MODEL, signal?: AbortSignal): Promise<ILLMResultResponse> {
+  async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
+    const actualModel = model || this.model;
     if (typeof prompt === 'string') {
       console.log('[Anthropic Connector] prompt length', prompt.length);
     } else {
@@ -27,7 +30,7 @@ export class AnthropicConnector implements ISimpleLLMConnector {
       let response: any;
       if (typeof prompt === 'string') {
         response = await this.client.messages.create({
-          model: model,
+          model: actualModel,
           max_tokens: 4000,
           system: [
             {
@@ -40,7 +43,7 @@ export class AnthropicConnector implements ISimpleLLMConnector {
         }, { signal });
       } else {
         response = await this.client.messages.create({
-          model: model,
+          model: actualModel,
           max_tokens: 4000,
           system: [
             {
@@ -97,7 +100,7 @@ export class AnthropicConnector implements ISimpleLLMConnector {
         console.log(`Calling Anthropic API (Attempt ${attempt})`);
         
         const response = await this.client.messages.create({
-          model: ANTHROPIC_MODEL,
+          model: this.model,
           max_tokens: 4000,
           system: [
             {

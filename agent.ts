@@ -5,7 +5,6 @@ import {
   FUNCTIONS_PROMPT, 
   FUNCTIONS_PROMPT_EXISTENSE, 
   FUNCTIONS_PROMPT_USAGE, 
-  IS_USE_SCHEDULED_REFLECTION, 
   LAST_INPUT_FIELD_PROMPT_PLACEHOLDER, 
   MIXINS_RESULT_FIELD_PROMPT_PLACEHOLDER, 
   PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER, 
@@ -70,8 +69,6 @@ export class Agent implements IAgent {
 
   status: EAgentStatus = EAgentStatus.IDLE;
   private workTimeout?: NodeJS.Timeout;
-  private readonly DEFAULT_WORK_TIMEOUT = 60000; // 1 minute default timeout
-  private readonly DEFAULT_PING_INTERVAL = 10000; // 10 seconds ping interval
   private readonly MULTIPLE_FUNCTIONS_TIMEOUT = 10000; // 10 seconds timeout for multiple functions execution
   private lastError?: string;
 
@@ -86,11 +83,13 @@ export class Agent implements IAgent {
   };
 
   private get workTimeoutMs(): number {
-    return this.agentSchema.workTimeout || this.DEFAULT_WORK_TIMEOUT;
+    const defaultTimeout = this.mainAgent?.envConfig?.DEFAULT_WORK_TIMEOUT ?? 60000;
+    return this.agentSchema.workTimeout || defaultTimeout;
   }
 
   private get pingIntervalMs(): number {
-    return this.agentSchema.pingInterval || this.DEFAULT_PING_INTERVAL;
+    const defaultInterval = this.mainAgent?.envConfig?.DEFAULT_PING_INTERVAL ?? 10000;
+    return this.agentSchema.pingInterval || defaultInterval;
   }
 
   get messages(): IAgentMessage[] {
@@ -116,7 +115,7 @@ export class Agent implements IAgent {
     this.functions = agentSchema.functions || [];
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
-    this.llmProcessor = new LLMProcessor();
+    this.llmProcessor = new LLMProcessor(this.mainAgent?.envConfig);
     this.processQueue = new SimpleQueue((item, signal) => this.processItem(item, signal));
     this.parentAgent = parentAgent;
 
@@ -234,7 +233,8 @@ export class Agent implements IAgent {
         console.log(`[Agent ${this.name}] Initializing reflection agent ${this.name}`);
         this.process('', this.name);
       }
-      if (IS_USE_SCHEDULED_REFLECTION) {
+      const isUseScheduledReflection = this.mainAgent?.envConfig?.IS_USE_SCHEDULED_REFLECTION ?? false;
+      if (isUseScheduledReflection) {
         schedule.scheduleJob(this.agentSchema.cronSchedule || '* * * * *', () => {
           console.log(`[Agent ${this.name}] Scheduling reflection agent ${this.name}`);
           this.process('', this.name);
@@ -404,8 +404,7 @@ export class Agent implements IAgent {
 
       this.addMessages([item]);
 
-      // HERE WE BUILD SPLIT_PROMPT
-      const prompt = await this.preRequestBuildPrompt(
+      this.splitPrompt = await this.preRequestBuildSplitPrompt(
         this.prompt, 
         this.getMessagesAsText(),
         mixinsResult,
@@ -552,7 +551,7 @@ export class Agent implements IAgent {
     }
   }
 
-  public async preRequestBuildPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<string> {
+  public async preRequestBuildSplitPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<ISplitPrompt> {
     const childrenStatusInfo = this.getChildrenStatusInfo();
     const promptWithContext = inPromptReplacer(prompt, {
       [LAST_INPUT_FIELD_PROMPT_PLACEHOLDER]: this.ctx.inputText,
@@ -564,12 +563,11 @@ export class Agent implements IAgent {
     const dynamicPrompt = promptWithContext.split(DYNAMIC_PROMPT_SEPARATOR);
     const cacheable = dynamicPrompt[0] ?? '';
     const nonCacheable = dynamicPrompt[1] ?? '';
-    this.splitPrompt = {
+    
+    return {
       cacheable,
       nonCacheable,
-    }
-
-    return promptWithContext;
+    };
   }
 
   private contextPolyfill(item: IAgentMessage): void {

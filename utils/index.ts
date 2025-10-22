@@ -5,3 +5,4 @@ export * from './generic-items-store';
 export * from './promise-utils';
 export * from './prompt-polyfill';
 export * from './simple-queue';
+export * from './env-utils';

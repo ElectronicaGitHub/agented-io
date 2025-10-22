@@ -1,6 +1,7 @@
 import { EAgentStatus } from '../enums';
 import { IAgentFunctionDefinition, IMarketplaceFunctionDefinition } from './agent-function';
 import { IAgentMessage } from './agent-message';
+import { ISplitPrompt } from './agent-split-prompt';
 
 export interface IAgent {
   id: string;
@@ -10,7 +11,7 @@ export interface IAgent {
   marketplaceFunctions?: IMarketplaceFunctionDefinition[];
   status: EAgentStatus;
   
-  preRequestBuildPrompt(prompt: string, messages: string[]): Promise<string>;
+  preRequestBuildSplitPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<ISplitPrompt>;
   process(text: string, role: string): void;
   init(): Promise<void>;
   

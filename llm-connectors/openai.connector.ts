@@ -2,23 +2,27 @@ import fs from 'fs/promises';
 import path from 'path';
 import { OpenAI } from 'openai';
 import { TextContentBlock } from 'openai/resources/beta/threads/messages';
-import { OPENAI_EMBEDDING_MODEL, OPENAI_KEY, OPENAI_MODEL } from '../consts';
-import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector } from '../interfaces';
+import { OPENAI_EMBEDDING_MODEL, OPENAI_MODEL } from '../consts';
+import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector, IEnvOptions } from '../interfaces';
 
 export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector {
-  private client = new OpenAI({
-    apiKey: OPENAI_KEY,
-  });
+  private client: OpenAI;
   private systemPrompt: string | null = null;
 
   constructor(
     private assistantId: string,
-  ) {}
+    private envConfig: Required<IEnvOptions>,
+  ) {
+    this.client = new OpenAI({
+      apiKey: this.envConfig.OPENAI_KEY,
+    });
+  }
 
-  async sendChatMessage(prompt: string, model: string = OPENAI_MODEL, signal?: AbortSignal): Promise<ILLMResultResponse> {
+  async sendChatMessage(prompt: string, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
+    const actualModel = model || OPENAI_MODEL;
     try {
       const response = await this.client.chat.completions.create({
-        model: model,
+        model: actualModel,
         messages: [{
           role: 'user',
           content: prompt
