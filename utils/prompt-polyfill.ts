@@ -3,7 +3,7 @@ import {
   CHILDREN_FIELD_PROMPT_PLACEHOLDER, 
   FUNCTIONS_FIELD_PROMPT_PLACEHOLDER,
   SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER,
-} from '../consts/agent';
+} from '../consts';
 import { IAgentSchema, IAgentUnitedFunction } from '../interfaces';
 
 export function promptPolyfill(basePrompt: string, {

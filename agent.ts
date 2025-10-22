@@ -1,23 +1,23 @@
 import { 
-  BASE_DECIDER_PROMPT, 
-  BASE_REFLECTION_PROMPT, 
   CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER, 
-  FUNCTIONS_PROMPT, 
-  FUNCTIONS_PROMPT_EXISTENSE, 
-  FUNCTIONS_PROMPT_USAGE, 
-  IS_USE_SCHEDULED_REFLECTION, 
   LAST_INPUT_FIELD_PROMPT_PLACEHOLDER, 
   MIXINS_RESULT_FIELD_PROMPT_PLACEHOLDER, 
   PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER, 
   PROMPT_LAST_MESSAGES_N, 
-  TEXT_PROMPT_USAGE,
   CHILDREN_STATUS_FIELD_PROMPT_PLACEHOLDER,
-  getPromptsDirectory,
-  BASE_DECIDER_DYNAMIC_PROMPT,
   DYNAMIC_PROMPT_SEPARATOR
   } from './consts';
+import { validateCustomPrompt } from './utils/prompt-validation';
+import { 
+  BASE_DECIDER_PROMPT_TEMPLATE,
+  BASE_DECIDER_DYNAMIC_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_USAGE_TEMPLATE,
+  BASE_REFLECTION_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_EXISTENCE_TEMPLATE,
+  TEXT_PROMPT_USAGE_TEMPLATE,
+} from './prompts-ts';
 import { LLMProcessor } from './processors/llm-processor';
-import { readFileAsync } from './utils/file-utils';
 import { SimpleQueue } from './utils/simple-queue';
 import { EAgentResponseType, EAgentType } from './enums/agent-type';
 import { EAgentEvent } from './enums/agent-event';
@@ -70,8 +70,6 @@ export class Agent implements IAgent {
 
   status: EAgentStatus = EAgentStatus.IDLE;
   private workTimeout?: NodeJS.Timeout;
-  private readonly DEFAULT_WORK_TIMEOUT = 60000; // 1 minute default timeout
-  private readonly DEFAULT_PING_INTERVAL = 10000; // 10 seconds ping interval
   private readonly MULTIPLE_FUNCTIONS_TIMEOUT = 10000; // 10 seconds timeout for multiple functions execution
   private lastError?: string;
 
@@ -86,11 +84,13 @@ export class Agent implements IAgent {
   };
 
   private get workTimeoutMs(): number {
-    return this.agentSchema.workTimeout || this.DEFAULT_WORK_TIMEOUT;
+    const defaultTimeout = this.mainAgent?.envConfig?.DEFAULT_WORK_TIMEOUT ?? 60000;
+    return this.agentSchema.workTimeout || defaultTimeout;
   }
 
   private get pingIntervalMs(): number {
-    return this.agentSchema.pingInterval || this.DEFAULT_PING_INTERVAL;
+    const defaultInterval = this.mainAgent?.envConfig?.DEFAULT_PING_INTERVAL ?? 10000;
+    return this.agentSchema.pingInterval || defaultInterval;
   }
 
   get messages(): IAgentMessage[] {
@@ -116,7 +116,7 @@ export class Agent implements IAgent {
     this.functions = agentSchema.functions || [];
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
-    this.llmProcessor = new LLMProcessor();
+    this.llmProcessor = new LLMProcessor(this.mainAgent?.envConfig);
     this.processQueue = new SimpleQueue((item, signal) => this.processItem(item, signal));
     this.parentAgent = parentAgent;
 
@@ -137,37 +137,34 @@ export class Agent implements IAgent {
   }
 
   private async getCombinedPromptWithFunctions(): Promise<string> {
-    // If the agent is configured to start with an empty base prompt,
-    // bypass loading any built-in prompts entirely
-    if (this.agentSchema.options?.emptyBasePrompt) {
-      // Use only schema-level prompts (prompt + flowInstructionPrompt)
-      return this.getSpecialInstructions();
+    // If custom prompt is provided, validate and use it
+    if (this.agentSchema.customPrompt) {
+      console.log(`[Agent ${this.name}] Using custom prompt`);
+      
+      // Validate custom prompt (strict mode - will throw on error)
+      validateCustomPrompt(this.agentSchema.customPrompt, true);
+      
+      return this.agentSchema.customPrompt;
     }
+
     let prompt = this.agentSchema.prompt || '';
     // reflection agent
     if (this.agentSchema.type === EAgentType.REFLECTION) {
-      const textPromptUsage = await readFileAsync(TEXT_PROMPT_USAGE, getPromptsDirectory());
-      const functionsExistensePrompt = await readFileAsync(FUNCTIONS_PROMPT_EXISTENSE, getPromptsDirectory());
-      const baseReflectionPrompt = await readFileAsync(BASE_REFLECTION_PROMPT, getPromptsDirectory());
-      const finalReflectionPrompt = inPromptReplacer(baseReflectionPrompt, {
+      const finalReflectionPrompt = inPromptReplacer(BASE_REFLECTION_PROMPT_TEMPLATE, {
         [PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER]: this.parentAgent?.getSpecialInstructions() || '',
       });
       prompt = [
         finalReflectionPrompt,
-        functionsExistensePrompt,
-        textPromptUsage,
+        FUNCTIONS_PROMPT_EXISTENCE_TEMPLATE,
+        TEXT_PROMPT_USAGE_TEMPLATE,
       ].join('\n\n');
     } else {
-      // permanent agent
-      const functionsPrompt = await readFileAsync(FUNCTIONS_PROMPT, getPromptsDirectory());
-      const functionsPromptUsage = await readFileAsync(FUNCTIONS_PROMPT_USAGE, getPromptsDirectory());
-      const baseDeciderPrompt = await readFileAsync(BASE_DECIDER_PROMPT, getPromptsDirectory());
-      const baseDeciderDynamicPrompt = await readFileAsync(BASE_DECIDER_DYNAMIC_PROMPT, getPromptsDirectory());
+      // permanent agent - use TypeScript prompts
       prompt = [
-        baseDeciderPrompt,
-        functionsPrompt,
-        functionsPromptUsage,
-        baseDeciderDynamicPrompt,
+        BASE_DECIDER_PROMPT_TEMPLATE,
+        FUNCTIONS_PROMPT_TEMPLATE,
+        FUNCTIONS_PROMPT_USAGE_TEMPLATE,
+        BASE_DECIDER_DYNAMIC_PROMPT_TEMPLATE,
       ].join('\n\n');
     }
     return prompt;
@@ -240,7 +237,8 @@ export class Agent implements IAgent {
         console.log(`[Agent ${this.name}] Initializing reflection agent ${this.name}`);
         this.process('', this.name);
       }
-      if (IS_USE_SCHEDULED_REFLECTION) {
+      const isUseScheduledReflection = this.mainAgent?.envConfig?.IS_USE_SCHEDULED_REFLECTION ?? false;
+      if (isUseScheduledReflection) {
         schedule.scheduleJob(this.agentSchema.cronSchedule || '* * * * *', () => {
           console.log(`[Agent ${this.name}] Scheduling reflection agent ${this.name}`);
           this.process('', this.name);
@@ -410,8 +408,7 @@ export class Agent implements IAgent {
 
       this.addMessages([item]);
 
-      // HERE WE BUILD SPLIT_PROMPT
-      const prompt = await this.preRequestBuildPrompt(
+      this.splitPrompt = await this.preRequestBuildSplitPrompt(
         this.prompt, 
         this.getMessagesAsText(),
         mixinsResult,
@@ -558,7 +555,7 @@ export class Agent implements IAgent {
     }
   }
 
-  public async preRequestBuildPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<string> {
+  public async preRequestBuildSplitPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<ISplitPrompt> {
     const childrenStatusInfo = this.getChildrenStatusInfo();
     const promptWithContext = inPromptReplacer(prompt, {
       [LAST_INPUT_FIELD_PROMPT_PLACEHOLDER]: this.ctx.inputText,
@@ -570,12 +567,11 @@ export class Agent implements IAgent {
     const dynamicPrompt = promptWithContext.split(DYNAMIC_PROMPT_SEPARATOR);
     const cacheable = dynamicPrompt[0] ?? '';
     const nonCacheable = dynamicPrompt[1] ?? '';
-    this.splitPrompt = {
+    
+    return {
       cacheable,
       nonCacheable,
-    }
-
-    return promptWithContext;
+    };
   }
 
   private contextPolyfill(item: IAgentMessage): void {

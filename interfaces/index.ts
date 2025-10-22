@@ -16,3 +16,4 @@ export * from './custom-agent-data';
 export * from './custom-agent-store';
 export * from './agent-united-function';
 export * from './agent-split-prompt';
+export * from './env-options';

@@ -1,5 +1,5 @@
 import { Agent } from '../agent';
-import { IAgent, IAgentSchema, IMainAgent } from '../interfaces';
+import { IAgent, IAgentSchema, IMainAgent, IEnvOptions } from '../interfaces';
 import { MainAgent } from '../main-agent';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -10,7 +10,7 @@ export const createAgentFactory = (agentSchema: IAgentSchema, parentAgent?: IAge
   return agent; 
 }
 
-export const createMainAgentFactory = (agentSchema: IAgentSchema, id?: string) => {
+export const createMainAgentFactory = (agentSchema: IAgentSchema, id?: string, envOptions?: IEnvOptions) => {
   const newId = id || uuidv4();
-  return new MainAgent(newId, agentSchema);
+  return new MainAgent(newId, agentSchema, envOptions);
 }

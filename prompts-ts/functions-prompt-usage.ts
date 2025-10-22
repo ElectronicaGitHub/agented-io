@@ -1,14 +1,14 @@
-Non-functional responses:
-```json
+export const FUNCTIONS_PROMPT_USAGE_TEMPLATE = `Non-functional responses:
+\`\`\`json
 {
   "type": "text",
   "text": "<This is the result>", <-- Here is the result for the user
   "finished": true
 }
-```
+\`\`\`
 
 Format:
-```json
+\`\`\`json
 {
   "type": "function",
   "functionName": "function_name",
@@ -19,10 +19,10 @@ Format:
   "finished": boolean,
   "explanation": "I give this result because I have enough data to give result to a user. <More explanation>"
 }
-```
+\`\`\`
 
 Examples:
-```json
+\`\`\`json
 {
   "type": "function",
   "functionName": "function",
@@ -53,10 +53,10 @@ If the task requires to get data from multiple resources/to use multiple functio
   "finished": false,
   "explanation": "I give this result because I have enough data to give result to a user. <More explanation>"
 }]
-```
+\`\`\`
 
 Agent example:
-```json
+\`\`\`json
 {
   "type": "agent",
   "name": "example_agent",
@@ -64,9 +64,9 @@ Agent example:
   "specialInstructions": "User want you to generate a text about a cat",
   "finished": false
 }
-```
+\`\`\`
 
 IMPORTANT!!! 
 1/ You should always respond in JSON format, and not in text, without any starting words.
 2/ For regular response - It's ALWAYS an object, NOT array of objects.
-3/ For multiple independent functions (where data from one function is not needed by another) - you can respond with an array of function objects: [{}, {}, ...]
+3/ For multiple independent functions (where data from one function is not needed by another) - you can respond with an array of function objects: [{}, {}, ...]`;

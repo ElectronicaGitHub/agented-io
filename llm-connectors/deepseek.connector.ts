@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
-import { DEEPSEEK_KEY, DEEPSEEK_MODEL } from '../consts';
-import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt } from '../interfaces';
+import { DEEPSEEK_MODEL } from '../consts';
+import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -10,27 +10,30 @@ interface ChatMessage {
 }
 
 export class DeepSeekConnector implements ISimpleLLMConnector {
-  private client = new OpenAI({
-    baseURL: 'https://api.deepseek.com',
-    apiKey: DEEPSEEK_KEY,
-  });
+  private client: OpenAI;
   private systemPrompt: string | null = null;
 
-  constructor() {}
+  constructor(private envConfig: Required<IEnvOptions>) {
+    this.client = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: this.envConfig.DEEPSEEK_KEY,
+    });
+  }
 
-  async sendChatMessage(prompt: string | ISplitPrompt, model: string = DEEPSEEK_MODEL, signal?: AbortSignal): Promise<ILLMResultResponse> {
+  async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
+    const actualModel = model || DEEPSEEK_MODEL;
     
     if (typeof prompt === 'string') {
-      console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${model}`, prompt.length);
+      console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
     } else {
-      console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${model}`, prompt.cacheable.length, prompt.nonCacheable.length);
+      console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.cacheable.length, prompt.nonCacheable.length);
     }
     
     try {
       let response: any;
       if (typeof prompt === 'string') {
         response = await this.client.chat.completions.create({
-          model: model,
+          model: actualModel,
           messages: [{
             role: 'user',
             content: prompt
@@ -38,7 +41,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
         }, { signal });
       } else {
         response = await this.client.chat.completions.create({
-          model: model,
+          model: actualModel,
           messages: [
             { role: 'system', content: prompt.cacheable },
             { role: 'user', content: prompt.nonCacheable }

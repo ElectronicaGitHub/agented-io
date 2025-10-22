@@ -1,27 +1,33 @@
 import { jsonrepair } from 'jsonrepair';
 import { saveJsonToFileAsync } from '../utils/file-utils';
-import { ELLMProvider, FAST_REQUEST_LLM_PROVIDER, LAST_LLM_RESULT_RAW_FILENAME, LLM_CONNECTORS_SUBSTITUTE, LLM_PROVIDER, LLM_RESULT_TIMEOUT_MS, OPENAI_ASSISTANT_VALVE_ID } from '../consts';
-import { ISimpleLLMConnector, ISplitPrompt } from '../interfaces';
+import { ELLMProvider, LAST_LLM_RESULT_RAW_FILENAME } from '../consts';
+import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 import { AnthropicConnector } from '../llm-connectors/anthropic.connector';
 import { DeepSeekConnector } from '../llm-connectors/deepseek.connector';
 import { OpenAIConnector } from '../llm-connectors/openai.connector';
 import { withTimeout } from '../utils/promise-utils';
+import { getEnvConfig } from '../utils/env-utils';
 
 export class LLMProcessor {
   private connectors: Partial<Record<ELLMProvider, ISimpleLLMConnector>>;
-  private lastWorkingProvider: ELLMProvider = LLM_PROVIDER;
+  private envConfig: Required<IEnvOptions>;
+  private lastWorkingProvider: ELLMProvider;
 
-  constructor() {
+  constructor(envConfig?: Required<IEnvOptions>) {
+    // If envConfig is provided, use it; otherwise create from process.env
+    this.envConfig = envConfig || getEnvConfig();
+    this.lastWorkingProvider = this.envConfig.LLM_PROVIDER;
+    
     this.connectors = {
-      [ELLMProvider.Anthropic]: new AnthropicConnector(),
-      [ELLMProvider.OpenAI]: new OpenAIConnector(OPENAI_ASSISTANT_VALVE_ID),
-      [ELLMProvider.DeepSeek]: new DeepSeekConnector(),
+      [ELLMProvider.Anthropic]: new AnthropicConnector(this.envConfig),
+      [ELLMProvider.OpenAI]: new OpenAIConnector(this.envConfig.OPENAI_ASSISTANT_VALVE_ID, this.envConfig),
+      [ELLMProvider.DeepSeek]: new DeepSeekConnector(this.envConfig),
     }
   }
 
   async sendMessage(
     text: string | ISplitPrompt, 
-    provider: ELLMProvider = FAST_REQUEST_LLM_PROVIDER, 
+    provider?: ELLMProvider, 
     model?: string,
     signal?: AbortSignal
   ): Promise<{
@@ -31,10 +37,11 @@ export class LLMProcessor {
       outputTokens: number;
     };
   }> {
+    const actualProvider = provider || this.envConfig.FAST_REQUEST_LLM_PROVIDER;
     try {
-      const connector = this.connectors[provider];
+      const connector = this.connectors[actualProvider];
       if (!connector) {
-        throw new Error(`Unsupported provider: ${provider}`);
+        throw new Error(`Unsupported provider: ${actualProvider}`);
       }
 
       const response = await connector.sendChatMessage(text, model, signal);
@@ -46,7 +53,7 @@ export class LLMProcessor {
         }
       };
     } catch (error) {
-      console.log(`[LLMProcessor.sendMessage] Error when sending message to ${provider}:`, error);
+      console.log(`[LLMProcessor.sendMessage] Error when sending message to ${actualProvider}:`, error);
       throw error; // Propagate the error to be handled by the caller
     }
   }
@@ -69,7 +76,7 @@ export class LLMProcessor {
 
   private async tryMultipleProvidersSendMessage(
     message: string | ISplitPrompt, 
-    startingProvider: ELLMProvider = LLM_PROVIDER,
+    startingProvider?: ELLMProvider,
     allowString: boolean = false,
     signal?: AbortSignal
   ): Promise<{
@@ -79,9 +86,15 @@ export class LLMProcessor {
       outputTokens: number;
     };
   }> {
-    const providersToTry = [startingProvider];
+    const actualStartingProvider = startingProvider || this.envConfig.LLM_PROVIDER;
+    const providersToTry = [actualStartingProvider];
     
-    const substitutes = LLM_CONNECTORS_SUBSTITUTE[startingProvider as keyof typeof LLM_CONNECTORS_SUBSTITUTE] || [];
+    const substituteMap = {
+      [ELLMProvider.OpenAI]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_OPENAI],
+      [ELLMProvider.Anthropic]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC],
+      [ELLMProvider.DeepSeek]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK],
+    };
+    const substitutes = substituteMap[actualStartingProvider as keyof typeof substituteMap] || [];
     for (const provider of substitutes) {
       if (!providersToTry.includes(provider)) {
         providersToTry.push(provider);
@@ -130,7 +143,7 @@ export class LLMProcessor {
       const sendPromise = this.sendMessage(cleanedMessage, provider, undefined, signal);
       const response = await withTimeout(
         sendPromise,
-        LLM_RESULT_TIMEOUT_MS,
+        this.envConfig.LLM_RESULT_TIMEOUT_MS,
         `LLM ${provider} request timeout`
       );
 

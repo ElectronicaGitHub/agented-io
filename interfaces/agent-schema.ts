@@ -36,17 +36,6 @@ export interface IAgentSchema {
   reflections?: IAgentSchema[];
   children?: IAgentSchema[];
   /**
-   * Optional flags to tweak agent behavior
-   */
-  options?: {
-    /**
-     * If true, the agent will start with an empty base prompt and will not load
-     * any built-in decider/reflection prompts. This effectively disables
-     * agent conversation unless explicitly provided via other mechanisms.
-     */
-    emptyBasePrompt?: boolean;
-  };
-  /**
    * This is the cron schedule for the reflection agent
    */
   cronSchedule?: string;
@@ -64,6 +53,12 @@ export interface IAgentSchema {
    * Defaults to 10000 (10 seconds)
    */
   pingInterval?: number;
+  /**
+   * Custom prompt that overrides the default system prompt.
+   * Must include required placeholders for chat_history and last_input.
+   * Will be validated on initialization.
+   */
+  customPrompt?: string;
 }
 
 export interface IAgentMixin {

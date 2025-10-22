@@ -3,8 +3,9 @@ import { IAgentSchema } from './interfaces/agent-schema';
 import { SimpleQueue } from './utils/simple-queue';
 import { EAgentEvent } from './enums';
 import { createAgentFactory } from './utils/agent-factory';
-import { IAgent, IAgentMessage, IMainAgent } from './interfaces';
+import { IAgent, IAgentMessage, IMainAgent, IEnvOptions } from './interfaces';
 import { PROMPT_LAST_MESSAGES_N } from './consts/llm';
+import { getEnvConfig } from './utils/env-utils';
 
 export class MainAgent implements IMainAgent {
   agents: IAgent[] = [];
@@ -15,11 +16,17 @@ export class MainAgent implements IMainAgent {
   // New messagesMap to store messages between parent and child agents
   private messagesMap: Record<string, IAgentMessage[]> = {};
   private agentsMap: Record<string, IAgent> = {};
+  
+  // Environment configuration resolved once
+  public envConfig: Required<IEnvOptions>;
 
   constructor(
     public id: string,
     private agentSchema: IAgentSchema,
-  ) {}
+    public envOptions?: IEnvOptions,
+  ) {
+    this.envConfig = getEnvConfig(envOptions);
+  }
 
   init() {
     console.log('[MainAgent.constructor] Agent started');
