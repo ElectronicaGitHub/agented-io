@@ -9,9 +9,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc && npm run copy-prompts",
+    "build": "tsc",
     "build:watch": "tsc --watch",
-    "copy-prompts": "cp -r prompts dist/",
     "clean": "rimraf dist",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "jest",
