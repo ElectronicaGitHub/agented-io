@@ -53,6 +53,12 @@ export interface IAgentSchema {
    * Defaults to 10000 (10 seconds)
    */
   pingInterval?: number;
+  /**
+   * Custom prompt that overrides the default system prompt.
+   * Must include required placeholders for chat_history and last_input.
+   * Will be validated on initialization.
+   */
+  customPrompt?: string;
 }
 
 export interface IAgentMixin {

@@ -8,12 +8,6 @@ jest.mock('../processors/llm-processor');
 jest.mock('../main-agent');
 jest.mock('../utils/agent-factory');
 
-
-// Mock file reading for prompts
-jest.mock('../utils/file-utils', () => ({
-  readFileAsync: jest.fn().mockResolvedValue('Mocked prompt content'),
-}));
-
 describe('Agent Integration - Multiple Functions', () => {
   let agent: Agent;
   let mockAgentSchema: IAgentSchema;

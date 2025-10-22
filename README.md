@@ -10,6 +10,13 @@ AI Agent Framework for building intelligent agents with LLM integration, functio
 - 🧠 **Reflection Capabilities**: Agents can reflect on their own performance and improve
 - 📝 **TypeScript Support**: Full TypeScript support with type definitions
 - 🚀 **Modular Design**: Clean separation of concerns with modular architecture
+- 🎨 **Custom Prompts**: Full control over agent behavior with custom system prompts and validation
+
+## Documentation
+
+- 📖 **[Custom Prompts Guide](./docs/CUSTOM_PROMPTS.md)** - Complete guide on creating custom prompts with validation
+- 🔧 **[Constants Reference](./consts/README.md)** - Overview of all constants and placeholders
+- 💡 **[Custom Prompt Examples](./examples/custom-prompt-example.ts)** - Code examples for custom prompts
 
 ## Installation
 
@@ -282,6 +289,64 @@ async function initializeArbitrageSystem() {
 - **Scheduled Execution**: Reflection agent runs every hour for continuous monitoring
 - **Specialized Functions**: Worker agent has access to Raydium-specific functions
 - **Workflow Coordination**: Main agent coordinates the overall arbitrage detection process
+
+## Custom Prompts
+
+You can fully customize agent behavior by providing custom system prompts. The framework includes validation to ensure your prompts contain all required placeholders.
+
+```typescript
+import { 
+  MainAgent,
+  EAgentType,
+  CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER,
+  LAST_INPUT_FIELD_PROMPT_PLACEHOLDER,
+  FUNCTIONS_FIELD_PROMPT_PLACEHOLDER,
+  DYNAMIC_PROMPT_SEPARATOR,
+  validateCustomPrompt,
+} from 'agented.io';
+
+const customPrompt = `
+You are a specialized customer support agent.
+
+Available Functions:
+${FUNCTIONS_FIELD_PROMPT_PLACEHOLDER}
+
+Chat History:
+${CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER}
+
+${DYNAMIC_PROMPT_SEPARATOR}
+
+Current Input:
+${LAST_INPUT_FIELD_PROMPT_PLACEHOLDER}
+`;
+
+// Validate the prompt
+validateCustomPrompt(customPrompt, true);
+
+// Create agent with custom prompt
+const agent = new MainAgent('support-agent', {
+  id: 'support-agent',
+  name: 'SupportAgent',
+  type: EAgentType.PERMANENT,
+  customPrompt,
+});
+
+agent.init();
+```
+
+**Key Features:**
+- ✅ **Automatic Validation**: Prompts are validated on initialization
+- 📋 **Required Placeholders**: `{{chat_history}}` and `{{last_input}}` are mandatory
+- ⚡ **Caching Optimization**: Use `DYNAMIC_PROMPT_SEPARATOR` to split cacheable/non-cacheable parts
+- 🔧 **Full Control**: Complete customization of agent behavior
+- 📚 **Template Library**: Import and modify base templates
+
+For detailed documentation, examples, and best practices, see:
+- **[Custom Prompts Guide](./docs/CUSTOM_PROMPTS.md)** - Complete documentation
+- **[Custom Prompt Examples](./examples/custom-prompt-example.ts)** - Code examples
+
+**Available Placeholders:**
+All prompt placeholders are available in `consts/agent-placeholders.ts` and can be imported from `agented.io`.
 
 ## Function Definitions
 

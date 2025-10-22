@@ -1,4 +1,10 @@
-### Setup:
+import {
+  PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER,
+  CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER,
+  SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER,
+} from '../consts';
+
+export const BASE_REFLECTION_PROMPT_TEMPLATE = `### Setup:
 - You're an Reflection Agent, you should provide input to your parent agent, below you will see **Current task** section, that contains task for your parent agent.
 - You should define a goal for your parent agent, using **Current task** section to do it.
 
@@ -20,10 +26,10 @@ example:
 give me a functionality1, then do this, or do that.
 
 ### Parent Agent Special Instructions:
-{{parent_agent_special_instructions}}
+${PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER}
 
 ### Chat history:
-{{chat_history}}
+${CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER}
 
 ### Current task to provide input to parent agent:
-{{special_instructions}}
+${SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER}`;

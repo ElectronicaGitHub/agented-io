@@ -20,3 +20,9 @@ export * from './processors';
 // LLM Connectors
 export * from './llm-connectors';
 
+// Prompts (TypeScript)
+export * from './prompts-ts';
+
+// Prompt validation utilities
+export { validateCustomPrompt, getAvailablePlaceholders } from './utils/prompt-validation';
+export type { IPromptValidationResult } from './utils/prompt-validation';

@@ -1,22 +1,23 @@
 import { 
-  BASE_DECIDER_PROMPT, 
-  BASE_REFLECTION_PROMPT, 
   CHAT_HISTORY_FIELD_PROMPT_PLACEHOLDER, 
-  FUNCTIONS_PROMPT, 
-  FUNCTIONS_PROMPT_EXISTENSE, 
-  FUNCTIONS_PROMPT_USAGE, 
   LAST_INPUT_FIELD_PROMPT_PLACEHOLDER, 
   MIXINS_RESULT_FIELD_PROMPT_PLACEHOLDER, 
   PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER, 
   PROMPT_LAST_MESSAGES_N, 
-  TEXT_PROMPT_USAGE,
   CHILDREN_STATUS_FIELD_PROMPT_PLACEHOLDER,
-  getPromptsDirectory,
-  BASE_DECIDER_DYNAMIC_PROMPT,
   DYNAMIC_PROMPT_SEPARATOR
   } from './consts';
+import { validateCustomPrompt } from './utils/prompt-validation';
+import { 
+  BASE_DECIDER_PROMPT_TEMPLATE,
+  BASE_DECIDER_DYNAMIC_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_USAGE_TEMPLATE,
+  BASE_REFLECTION_PROMPT_TEMPLATE,
+  FUNCTIONS_PROMPT_EXISTENCE_TEMPLATE,
+  TEXT_PROMPT_USAGE_TEMPLATE,
+} from './prompts-ts';
 import { LLMProcessor } from './processors/llm-processor';
-import { readFileAsync } from './utils/file-utils';
 import { SimpleQueue } from './utils/simple-queue';
 import { EAgentResponseType, EAgentType } from './enums/agent-type';
 import { EAgentEvent } from './enums/agent-event';
@@ -136,31 +137,34 @@ export class Agent implements IAgent {
   }
 
   private async getCombinedPromptWithFunctions(): Promise<string> {
+    // If custom prompt is provided, validate and use it
+    if (this.agentSchema.customPrompt) {
+      console.log(`[Agent ${this.name}] Using custom prompt`);
+      
+      // Validate custom prompt (strict mode - will throw on error)
+      validateCustomPrompt(this.agentSchema.customPrompt, true);
+      
+      return this.agentSchema.customPrompt;
+    }
+
     let prompt = this.agentSchema.prompt || '';
     // reflection agent
     if (this.agentSchema.type === EAgentType.REFLECTION) {
-      const textPromptUsage = await readFileAsync(TEXT_PROMPT_USAGE, getPromptsDirectory());
-      const functionsExistensePrompt = await readFileAsync(FUNCTIONS_PROMPT_EXISTENSE, getPromptsDirectory());
-      const baseReflectionPrompt = await readFileAsync(BASE_REFLECTION_PROMPT, getPromptsDirectory());
-      const finalReflectionPrompt = inPromptReplacer(baseReflectionPrompt, {
+      const finalReflectionPrompt = inPromptReplacer(BASE_REFLECTION_PROMPT_TEMPLATE, {
         [PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER]: this.parentAgent?.getSpecialInstructions() || '',
       });
       prompt = [
         finalReflectionPrompt,
-        functionsExistensePrompt,
-        textPromptUsage,
+        FUNCTIONS_PROMPT_EXISTENCE_TEMPLATE,
+        TEXT_PROMPT_USAGE_TEMPLATE,
       ].join('\n\n');
     } else {
-      // permanent agent
-      const functionsPrompt = await readFileAsync(FUNCTIONS_PROMPT, getPromptsDirectory());
-      const functionsPromptUsage = await readFileAsync(FUNCTIONS_PROMPT_USAGE, getPromptsDirectory());
-      const baseDeciderPrompt = await readFileAsync(BASE_DECIDER_PROMPT, getPromptsDirectory());
-      const baseDeciderDynamicPrompt = await readFileAsync(BASE_DECIDER_DYNAMIC_PROMPT, getPromptsDirectory());
+      // permanent agent - use TypeScript prompts
       prompt = [
-        baseDeciderPrompt,
-        functionsPrompt,
-        functionsPromptUsage,
-        baseDeciderDynamicPrompt,
+        BASE_DECIDER_PROMPT_TEMPLATE,
+        FUNCTIONS_PROMPT_TEMPLATE,
+        FUNCTIONS_PROMPT_USAGE_TEMPLATE,
+        BASE_DECIDER_DYNAMIC_PROMPT_TEMPLATE,
       ].join('\n\n');
     }
     return prompt;
