@@ -1,6 +1,6 @@
 {
   "name": "agented-io",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "AI Agent Framework for building intelligent agents with LLM integration, function calling, and reflection capabilities",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
