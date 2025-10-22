@@ -2,6 +2,7 @@ export const OPENAI_MODEL = 'gpt-4o';
 // export const OPENAI_MODEL = 'gpt-4o-mini';
 export const ANTHROPIC_MODEL = (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514') as string;
 export const DEEPSEEK_MODEL = 'deepseek-chat';
+export const GROK_MODEL = 'grok-beta';
 
 export const ANTHROPIC_MAX_RETRIES = 3;
 export const ANTHROPIC_DELAY_MS = 1000;
@@ -13,6 +14,7 @@ export enum ELLMProvider {
   Anthropic = 'Anthropic',
   OpenRouter = 'OpenRouter',
   DeepSeek = 'DeepSeek',
+  Grok = 'Grok',
 }
 
 export const LLM_PROVIDER = (process.env.LLM_PROVIDER || ELLMProvider.Anthropic) as ELLMProvider;
@@ -29,4 +31,5 @@ export const LLM_CONNECTORS_SUBSTITUTE = {
   [ELLMProvider.OpenAI]: [(process.env.LLM_CONNECTORS_SUBSTITUTE_OPENAI || ELLMProvider.Anthropic)] as ELLMProvider[],
   [ELLMProvider.Anthropic]: [(process.env.LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC || ELLMProvider.DeepSeek)] as ELLMProvider[],
   [ELLMProvider.DeepSeek]: [(process.env.LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK || ELLMProvider.OpenAI)] as ELLMProvider[],
+  [ELLMProvider.Grok]: [(process.env.LLM_CONNECTORS_SUBSTITUTE_GROK || ELLMProvider.Anthropic)] as ELLMProvider[],
 }

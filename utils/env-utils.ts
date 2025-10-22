@@ -37,6 +37,7 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     OPENAI_KEY: getEnvValue('OPENAI_KEY', envOptions, ''),
     OPENAI_ASSISTANT_VALVE_ID: getEnvValue('OPENAI_ASSISTANT_VALVE_ID', envOptions, ''),
     DEEPSEEK_KEY: getEnvValue('DEEPSEEK_KEY', envOptions, ''),
+    GROK_KEY: getEnvValue('GROK_KEY', envOptions, ''),
     
     // LLM Models
     ANTHROPIC_MODEL: getEnvValue('ANTHROPIC_MODEL', envOptions, 'claude-sonnet-4-20250514'),
@@ -53,6 +54,7 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     LLM_CONNECTORS_SUBSTITUTE_OPENAI: getEnvValue('LLM_CONNECTORS_SUBSTITUTE_OPENAI', envOptions, ELLMProvider.Anthropic),
     LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC: getEnvValue('LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC', envOptions, ELLMProvider.DeepSeek),
     LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK: getEnvValue('LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK', envOptions, ELLMProvider.OpenAI),
+    LLM_CONNECTORS_SUBSTITUTE_GROK: getEnvValue('LLM_CONNECTORS_SUBSTITUTE_GROK', envOptions, ELLMProvider.Anthropic),
     
     // Agent Settings
     IS_USE_SCHEDULED_REFLECTION: getEnvValue('IS_USE_SCHEDULED_REFLECTION', envOptions, false),

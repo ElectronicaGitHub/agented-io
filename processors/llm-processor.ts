@@ -4,6 +4,7 @@ import { ELLMProvider, LAST_LLM_RESULT_RAW_FILENAME } from '../consts';
 import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 import { AnthropicConnector } from '../llm-connectors/anthropic.connector';
 import { DeepSeekConnector } from '../llm-connectors/deepseek.connector';
+import { GrokConnector } from '../llm-connectors/grok.connector';
 import { OpenAIConnector } from '../llm-connectors/openai.connector';
 import { withTimeout } from '../utils/promise-utils';
 import { getEnvConfig } from '../utils/env-utils';
@@ -22,6 +23,7 @@ export class LLMProcessor {
       [ELLMProvider.Anthropic]: new AnthropicConnector(this.envConfig),
       [ELLMProvider.OpenAI]: new OpenAIConnector(this.envConfig.OPENAI_ASSISTANT_VALVE_ID, this.envConfig),
       [ELLMProvider.DeepSeek]: new DeepSeekConnector(this.envConfig),
+      [ELLMProvider.Grok]: new GrokConnector(this.envConfig),
     }
   }
 
@@ -93,6 +95,7 @@ export class LLMProcessor {
       [ELLMProvider.OpenAI]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_OPENAI],
       [ELLMProvider.Anthropic]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC],
       [ELLMProvider.DeepSeek]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK],
+      [ELLMProvider.Grok]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_GROK],
     };
     const substitutes = substituteMap[actualStartingProvider as keyof typeof substituteMap] || [];
     for (const provider of substitutes) {

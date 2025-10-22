@@ -6,6 +6,7 @@ export interface IEnvOptions {
   OPENAI_KEY?: string;
   OPENAI_ASSISTANT_VALVE_ID?: string;
   DEEPSEEK_KEY?: string;
+  GROK_KEY?: string;
   
   // LLM Models
   ANTHROPIC_MODEL?: string;
@@ -22,6 +23,7 @@ export interface IEnvOptions {
   LLM_CONNECTORS_SUBSTITUTE_OPENAI?: ELLMProvider;
   LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC?: ELLMProvider;
   LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK?: ELLMProvider;
+  LLM_CONNECTORS_SUBSTITUTE_GROK?: ELLMProvider;
   
   // Agent Settings
   IS_USE_SCHEDULED_REFLECTION?: boolean;
