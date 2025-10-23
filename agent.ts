@@ -51,6 +51,10 @@ export type Middleware = (ctx: any) => Promise<void>;
 export class Agent implements IAgent {
   name: string;
   prompt: string;
+  /**
+   * Split prompt for caching optimization. Generated dynamically before each LLM request
+   * by splitting the prompt at DYNAMIC_PROMPT_SEPARATOR.
+   */
   splitPrompt: ISplitPrompt;
   parentAgent?: Agent;
   functions?: IAgentFunctionDefinition[];
@@ -112,7 +116,7 @@ export class Agent implements IAgent {
   ) {
     this.name = agentSchema.name;
     this.prompt = agentSchema.prompt || '';
-    this.splitPrompt = agentSchema.splitPrompt || { cacheable: '', nonCacheable: '' };
+    this.splitPrompt = { cacheable: '', nonCacheable: '' };
     this.functions = agentSchema.functions || [];
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
@@ -485,7 +489,7 @@ export class Agent implements IAgent {
         this.addMessages([event]);
       } else {
         this.emit(EAgentEvent.RESPONSE, event);
-        console.log(`[Agent ${this.name}] event.type: ${event.type}`);
+        // console.log(`[Agent ${this.name}] event.type: ${event.type}`);
         /**
          * Functional response should not be added to the messages
          * because it's already added to the messages and here - it's the same
@@ -891,7 +895,7 @@ export class Agent implements IAgent {
   }
 
   private cleanup() {
-    console.log(`[Agent ${this.name}] Starting cleanup. Current status: ${this.status}`);
+    // console.log(`[Agent ${this.name}] Starting cleanup. Current status: ${this.status}`);
   
     this.resources.timeouts.forEach(timeout => {
       clearTimeout(timeout);

@@ -1,7 +1,6 @@
 import { EAgentStatus, EAgentType } from '../enums';
 import { IAgentCtx } from './agent-ctx';
 import { IAgentFunctionDefinition, IMarketplaceFunctionDefinition } from './agent-function';
-import { ISplitPrompt } from './agent-split-prompt';
 import { IFunctionsStoreService } from './functions-store-service.interface';
 
 export interface IAgentSchema {
@@ -22,10 +21,6 @@ export interface IAgentSchema {
    * This prompt will be used to instruct the agent how to run specific tasks
    */
   flowInstructionPrompt?: string;
-  /**
-   * Split prompt configuration
-   */
-  splitPrompt?: ISplitPrompt;
   functions?: IAgentFunctionDefinition[];
   /**
    * Functions store service
