@@ -25,6 +25,14 @@ async function getAgentConfig() {
           b: 'number',
         },
       },
+      {
+        name: 'generateSomeText',
+        func: ({text}: {text: string}) => 'some text',
+        description: 'Generate some text',
+        // paramsToPass: {
+        //   text: 'number',
+        // },
+      },
     ],
   };
 }

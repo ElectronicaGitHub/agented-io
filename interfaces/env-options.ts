@@ -31,4 +31,8 @@ export interface IEnvOptions {
   DEFAULT_PING_INTERVAL?: number;
   MAX_RETRY_COUNT?: number;
   RETRY_BACKOFF_MULTIPLIER?: number;
+  
+  // Debug Settings
+  LOG_PROMPT?: boolean;
+  LOG_RESPONSE?: boolean;
 }

@@ -24,6 +24,8 @@ export const BASE_DECIDER_PROMPT_TEMPLATE = `You are ${AGENT_NAME_FIELD_PROMPT_P
 - Validate \`paramsToPass\` - must be complete and valid JSON
 - Ask user for missing params if no defaults provided
 - Function calls: \`finished: false\`
+- **CRITICAL**: If last message is a function result AND no more functions needed, return \`finished: true\` with that result to user
+- You can chain functions sequentially if result of one is needed for another
 
 ### Children:
 - Only use children from \`**Children to use:**\` section

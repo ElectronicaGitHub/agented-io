@@ -139,6 +139,20 @@ export class LLMProcessor {
       
       console.log(`[LLMProcessor.tryLLMProviderSendMessage] Sending request to ${provider} with message length: ${cleanedLength} (was ${originalLength}, removed ${originalLength - cleanedLength} characters)`);
       
+      // Log prompt if enabled
+      if (this.envConfig.LOG_PROMPT) {
+        console.log('\n=== LLM PROMPT START ===');
+        if (typeof cleanedMessage === 'string') {
+          console.log(cleanedMessage);
+        } else {
+          console.log('--- Cacheable part ---');
+          console.log(cleanedMessage.cacheable);
+          console.log('--- Non-cacheable part ---');
+          console.log(cleanedMessage.nonCacheable);
+        }
+        console.log('=== LLM PROMPT END ===\n');
+      }
+      
       if (!this.connectors[provider]) {
         throw new Error(`Unsupported provider: ${provider}`);
       }
@@ -152,6 +166,13 @@ export class LLMProcessor {
 
       if (!response.result) {
         throw new Error('Empty response from LLM');
+      }
+      
+      // Log response if enabled
+      if (this.envConfig.LOG_RESPONSE) {
+        console.log('\n=== LLM RESPONSE START ===');
+        console.log(response.result);
+        console.log('=== LLM RESPONSE END ===\n');
       }
       
       // Otherwise try to parse it as JSON
