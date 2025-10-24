@@ -10,6 +10,10 @@ export interface IEnvOptions {
   
   // LLM Models
   ANTHROPIC_MODEL?: string;
+  OPENAI_MODEL?: string;
+  OPENAI_EMBEDDING_MODEL?: string;
+  DEEPSEEK_MODEL?: string;
+  GROK_MODEL?: string;
   
   // LLM Providers
   LLM_PROVIDER?: ELLMProvider;
@@ -18,6 +22,9 @@ export interface IEnvOptions {
   // LLM Settings
   MAX_NUMBER_OF_TRIES_IN_FLOW?: number;
   LLM_RESULT_TIMEOUT_MS?: number;
+  LLM_MAX_RETRIES?: number;
+  LLM_RETRY_DELAY_MS?: number;
+  PROMPT_LAST_MESSAGES_N?: number;
   
   // LLM Connectors Substitute
   LLM_CONNECTORS_SUBSTITUTE_OPENAI?: ELLMProvider;

@@ -24,6 +24,124 @@ AI Agent Framework for building intelligent agents with LLM integration, functio
 npm install agented-io
 ```
 
+## Environment Configuration
+
+The framework supports flexible configuration through environment variables or programmatic options. All settings can be configured via:
+1. **Environment variables** (`.env` file)
+2. **Programmatic options** (`IEnvOptions` passed to `MainAgent`)
+3. **Default values** (built-in fallbacks)
+
+### Configuration Priority
+
+Settings are resolved in this order:
+1. `envOptions` passed to `MainAgent` constructor
+2. `process.env` environment variables
+3. Default values
+
+### Available Configuration Options
+
+#### API Keys
+```bash
+ANTHROPIC_API_KEY=your-anthropic-key
+OPENAI_KEY=your-openai-key
+DEEPSEEK_KEY=your-deepseek-key
+GROK_KEY=your-grok-key
+OPENAI_ASSISTANT_VALVE_ID=your-assistant-id
+```
+
+#### LLM Models
+```bash
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+OPENAI_MODEL=gpt-4o
+OPENAI_EMBEDDING_MODEL=text-embedding-ada-002
+DEEPSEEK_MODEL=deepseek-chat
+GROK_MODEL=grok-beta
+```
+
+#### LLM Providers
+```bash
+LLM_PROVIDER=Anthropic                    # Main LLM provider
+FAST_REQUEST_LLM_PROVIDER=DeepSeek        # Provider for fast requests
+```
+
+#### LLM Settings
+```bash
+MAX_NUMBER_OF_TRIES_IN_FLOW=5             # Max retries in agent flow
+LLM_RESULT_TIMEOUT_MS=30000               # Request timeout (30 seconds)
+LLM_MAX_RETRIES=3                         # Max retries for LLM requests
+LLM_RETRY_DELAY_MS=1000                   # Delay between retries (1 second)
+PROMPT_LAST_MESSAGES_N=15                 # Number of messages in chat history
+```
+
+#### LLM Connectors Substitute
+```bash
+LLM_CONNECTORS_SUBSTITUTE_OPENAI=Anthropic
+LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC=DeepSeek
+LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK=OpenAI
+LLM_CONNECTORS_SUBSTITUTE_GROK=Anthropic
+```
+
+#### Agent Settings
+```bash
+IS_USE_SCHEDULED_REFLECTION=true          # Enable scheduled reflection
+DEFAULT_WORK_TIMEOUT=60000                # Default work timeout (60 seconds)
+DEFAULT_PING_INTERVAL=10000               # Ping interval (10 seconds)
+MAX_RETRY_COUNT=3                         # Max retry count for agent operations
+RETRY_BACKOFF_MULTIPLIER=1.5              # Backoff multiplier for retries
+```
+
+#### Debug Settings
+```bash
+LOG_PROMPT=false                          # Log prompts to console
+LOG_RESPONSE=false                        # Log LLM responses to console
+```
+
+### Programmatic Configuration
+
+You can override any environment variable by passing `IEnvOptions` to the `MainAgent` constructor:
+
+```typescript
+import { MainAgent, IAgentSchema, IEnvOptions, ELLMProvider } from 'agented-io';
+
+const customEnvOptions: IEnvOptions = {
+  // API Keys
+  ANTHROPIC_API_KEY: 'your-custom-key',
+  
+  // LLM Models
+  ANTHROPIC_MODEL: 'claude-sonnet-4-20250514',
+  OPENAI_MODEL: 'gpt-4o',
+  DEEPSEEK_MODEL: 'deepseek-chat',
+  
+  // LLM Settings
+  LLM_PROVIDER: ELLMProvider.Anthropic,
+  FAST_REQUEST_LLM_PROVIDER: ELLMProvider.DeepSeek,
+  PROMPT_LAST_MESSAGES_N: 20,              // Custom history length
+  LLM_MAX_RETRIES: 5,                      // More retries
+  LLM_RETRY_DELAY_MS: 2000,                // Longer delay
+  
+  // Agent Settings
+  DEFAULT_WORK_TIMEOUT: 120000,            // 2 minutes
+  IS_USE_SCHEDULED_REFLECTION: true,
+  
+  // Debug
+  LOG_PROMPT: true,                        // Enable prompt logging
+  LOG_RESPONSE: true,                      // Enable response logging
+};
+
+const agentSchema: IAgentSchema = {
+  id: 'my-agent',
+  type: EAgentType.PERMANENT,
+  name: 'MyAgent',
+  prompt: 'You are a helpful assistant.',
+};
+
+// Create agent with custom configuration
+const mainAgent = new MainAgent('agent-1', agentSchema, customEnvOptions);
+mainAgent.init();
+```
+
+For more examples, see [env-options-usage.ts](./examples/env-options-usage.ts).
+
 ## Quick Start
 
 ```typescript

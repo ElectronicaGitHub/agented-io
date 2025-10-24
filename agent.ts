@@ -3,7 +3,6 @@ import {
   LAST_INPUT_FIELD_PROMPT_PLACEHOLDER, 
   MIXINS_RESULT_FIELD_PROMPT_PLACEHOLDER, 
   PARENT_AGENT_SPECIAL_INSTRUCTIONS_FIELD_PROMPT_PLACEHOLDER, 
-  PROMPT_LAST_MESSAGES_N, 
   CHILDREN_STATUS_FIELD_PROMPT_PLACEHOLDER,
   DYNAMIC_PROMPT_SEPARATOR
   } from './consts';
@@ -367,7 +366,8 @@ export class Agent implements IAgent {
   }
 
   getMessagesAsText(): string[] {
-    return this.messages.map(msg => `${msg.sender}: ${msg.text}`).slice(-PROMPT_LAST_MESSAGES_N);
+    const limit = this.mainAgent?.envConfig.PROMPT_LAST_MESSAGES_N || 15;
+    return this.messages.map(msg => `${msg.sender}: ${msg.text}`).slice(-limit);
   }
 
   setMessages(messages: IAgentMessage[]) {

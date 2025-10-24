@@ -4,7 +4,6 @@ import { SimpleQueue } from './utils/simple-queue';
 import { EAgentEvent } from './enums';
 import { createAgentFactory } from './utils/agent-factory';
 import { IAgent, IAgentMessage, IMainAgent, IEnvOptions } from './interfaces';
-import { PROMPT_LAST_MESSAGES_N } from './consts/llm';
 import { getEnvConfig } from './utils/env-utils';
 
 export class MainAgent implements IMainAgent {
@@ -111,8 +110,8 @@ export class MainAgent implements IMainAgent {
     this.messagesMap[key].push(...messages);
     
     // check for overfill PROMPT_LAST_MESSAGES_N
-    if (this.messagesMap[key].length > PROMPT_LAST_MESSAGES_N) {
-      this.messagesMap[key] = this.messagesMap[key].slice(-PROMPT_LAST_MESSAGES_N);
+    if (this.messagesMap[key].length > this.envConfig.PROMPT_LAST_MESSAGES_N) {
+      this.messagesMap[key] = this.messagesMap[key].slice(-this.envConfig.PROMPT_LAST_MESSAGES_N);
     }
     this.emit(EAgentEvent.MESSAGES_UPDATED, { parentId, childId, messages: this.messagesMap[key] });
     this.emit(EAgentEvent.MESSAGES_MAP_UPDATED_FULL, { messages: this.messagesMap });

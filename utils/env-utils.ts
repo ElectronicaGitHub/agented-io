@@ -41,6 +41,10 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     
     // LLM Models
     ANTHROPIC_MODEL: getEnvValue('ANTHROPIC_MODEL', envOptions, 'claude-sonnet-4-20250514'),
+    OPENAI_MODEL: getEnvValue('OPENAI_MODEL', envOptions, 'gpt-4o'),
+    OPENAI_EMBEDDING_MODEL: getEnvValue('OPENAI_EMBEDDING_MODEL', envOptions, 'text-embedding-ada-002'),
+    DEEPSEEK_MODEL: getEnvValue('DEEPSEEK_MODEL', envOptions, 'deepseek-chat'),
+    GROK_MODEL: getEnvValue('GROK_MODEL', envOptions, 'grok-beta'),
     
     // LLM Providers
     LLM_PROVIDER: getEnvValue('LLM_PROVIDER', envOptions, ELLMProvider.Anthropic),
@@ -49,6 +53,9 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     // LLM Settings
     MAX_NUMBER_OF_TRIES_IN_FLOW: getEnvValue('MAX_NUMBER_OF_TRIES_IN_FLOW', envOptions, 5),
     LLM_RESULT_TIMEOUT_MS: getEnvValue('LLM_RESULT_TIMEOUT_MS', envOptions, 30000),
+    LLM_MAX_RETRIES: getEnvValue('LLM_MAX_RETRIES', envOptions, 3),
+    LLM_RETRY_DELAY_MS: getEnvValue('LLM_RETRY_DELAY_MS', envOptions, 1000),
+    PROMPT_LAST_MESSAGES_N: getEnvValue('PROMPT_LAST_MESSAGES_N', envOptions, 15),
     
     // LLM Connectors Substitute
     LLM_CONNECTORS_SUBSTITUTE_OPENAI: getEnvValue('LLM_CONNECTORS_SUBSTITUTE_OPENAI', envOptions, ELLMProvider.Anthropic),

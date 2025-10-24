@@ -1,7 +1,6 @@
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
-import { DEEPSEEK_MODEL } from '../consts';
 import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 interface ChatMessage {
@@ -21,7 +20,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || DEEPSEEK_MODEL;
+    const actualModel = model || this.envConfig.DEEPSEEK_MODEL;
     
     if (typeof prompt === 'string') {
       console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
@@ -48,7 +47,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
           ],
         }, { signal });
       }
-      console.log('[Anthropic Connector] response.usage', response.usage);
+      console.log('[DeepSeek Connector] response.usage', response.usage);
       
       const result = response.choices[0].message.content;
       return { result: result as string };
@@ -93,7 +92,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
 
     try {
       const response = await this.client.chat.completions.create({
-        model: DEEPSEEK_MODEL,
+        model: this.envConfig.DEEPSEEK_MODEL,
         messages: messages
       }, { signal });
 

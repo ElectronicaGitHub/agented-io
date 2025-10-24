@@ -1,7 +1,6 @@
 import OpenAI from 'openai';
 import fs from 'fs/promises';
 import path from 'path';
-import { GROK_MODEL } from '../consts';
 import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 interface ChatMessage {
@@ -21,7 +20,7 @@ export class GrokConnector implements ISimpleLLMConnector {
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || GROK_MODEL;
+    const actualModel = model || this.envConfig.GROK_MODEL;
     
     if (typeof prompt === 'string') {
       console.log(`[GrokConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
@@ -93,7 +92,7 @@ export class GrokConnector implements ISimpleLLMConnector {
 
     try {
       const response = await this.client.chat.completions.create({
-        model: GROK_MODEL,
+        model: this.envConfig.GROK_MODEL,
         messages: messages
       }, { signal });
 

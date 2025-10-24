@@ -2,7 +2,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import { OpenAI } from 'openai';
 import { TextContentBlock } from 'openai/resources/beta/threads/messages';
-import { OPENAI_EMBEDDING_MODEL, OPENAI_MODEL } from '../consts';
 import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector, IEnvOptions } from '../interfaces';
 
 export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector {
@@ -19,7 +18,7 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
   }
 
   async sendChatMessage(prompt: string, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || OPENAI_MODEL;
+    const actualModel = model || this.envConfig.OPENAI_MODEL;
     try {
       const response = await this.client.chat.completions.create({
         model: actualModel,
@@ -118,7 +117,7 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
   async getEmbeddings(text: string): Promise<number[]> {
     try {
       const response = await this.client.embeddings.create({
-        model: OPENAI_EMBEDDING_MODEL,
+        model: this.envConfig.OPENAI_EMBEDDING_MODEL,
         input: text,
       });
       return response.data[0].embedding;

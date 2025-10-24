@@ -2,14 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs/promises';
 import path from 'path';
 import { TextBlock } from '@anthropic-ai/sdk/resources';
-import { ANTHROPIC_DELAY_MS, ANTHROPIC_MAX_RETRIES } from '../consts';
 import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 export class AnthropicConnector implements ISimpleLLMConnector {
   private client: Anthropic;
   private systemPrompt: string | null = null;
-  private maxRetries: number = ANTHROPIC_MAX_RETRIES;
-  private retryDelay: number = ANTHROPIC_DELAY_MS;
+  private maxRetries: number;
+  private retryDelay: number;
   private model: string;
 
   constructor(private envConfig: Required<IEnvOptions>) {
@@ -17,6 +16,8 @@ export class AnthropicConnector implements ISimpleLLMConnector {
       apiKey: this.envConfig.ANTHROPIC_API_KEY,
     });
     this.model = this.envConfig.ANTHROPIC_MODEL;
+    this.maxRetries = this.envConfig.LLM_MAX_RETRIES;
+    this.retryDelay = this.envConfig.LLM_RETRY_DELAY_MS;
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
