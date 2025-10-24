@@ -46,7 +46,6 @@ ANTHROPIC_API_KEY=your-anthropic-key
 OPENAI_KEY=your-openai-key
 DEEPSEEK_KEY=your-deepseek-key
 GROK_KEY=your-grok-key
-OPENAI_ASSISTANT_VALVE_ID=your-assistant-id
 ```
 
 #### LLM Models

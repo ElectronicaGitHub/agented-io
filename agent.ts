@@ -96,6 +96,14 @@ export class Agent implements IAgent {
     return this.agentSchema.pingInterval || defaultInterval;
   }
 
+  private get maxRetries(): number {
+    return this.mainAgent?.envConfig?.LLM_MAX_RETRIES ?? 3;
+  }
+
+  private get retryDelayMs(): number {
+    return this.mainAgent?.envConfig?.LLM_RETRY_DELAY_MS ?? 1000;
+  }
+
   get messages(): IAgentMessage[] {
     return this.mainAgent?.getMessages(this.parentAgent?.name || 'main', this.name) || [];
   }
@@ -418,20 +426,23 @@ export class Agent implements IAgent {
         mixinsResult,
       );
 
-      const MAX_RETRIES = 3;
       let retryCount = 0;
       let response: IAgentResponse | undefined;
 
-      while (retryCount < MAX_RETRIES) {
+      while (retryCount < this.maxRetries) {
         try {
           const { result, metadata } = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
           
           // Validate response format
           if (typeof result === 'string') {
-            console.log(`[Agent ${this.name}] Invalid response format (attempt ${retryCount + 1}/${MAX_RETRIES}):`, result);
+            console.log(`[Agent ${this.name}] Invalid response format (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
             retryCount++;
-            if (retryCount === MAX_RETRIES) {
-              throw new Error(`Failed to get valid response after ${MAX_RETRIES} attempts. Response was not an object.`);
+            if (retryCount === this.maxRetries) {
+              throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response was not an object.`);
+            }
+            // Add delay before retry
+            if (retryCount < this.maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
             }
             continue;
           }
@@ -449,10 +460,14 @@ export class Agent implements IAgent {
 
           // Validate response has required type field
           if (!result.type) {
-            console.log(`[Agent ${this.name}] Response missing type field (attempt ${retryCount + 1}/${MAX_RETRIES}):`, result);
+            console.log(`[Agent ${this.name}] Response missing type field (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
             retryCount++;
-            if (retryCount === MAX_RETRIES) {
-              throw new Error(`Failed to get valid response after ${MAX_RETRIES} attempts. Response missing type field.`);
+            if (retryCount === this.maxRetries) {
+              throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response missing type field.`);
+            }
+            // Add delay before retry
+            if (retryCount < this.maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
             }
             continue;
           }
@@ -460,10 +475,14 @@ export class Agent implements IAgent {
           response = result;
           break;
         } catch (error) {
-          console.error(`[Agent ${this.name}] Error getting LLM response (attempt ${retryCount + 1}/${MAX_RETRIES}):`, error);
+          console.error(`[Agent ${this.name}] Error getting LLM response (attempt ${retryCount + 1}/${this.maxRetries}):`, error);
           retryCount++;
-          if (retryCount === MAX_RETRIES) {
+          if (retryCount === this.maxRetries) {
             throw error;
+          }
+          // Add delay before retry
+          if (retryCount < this.maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
           }
         }
       }

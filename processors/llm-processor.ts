@@ -21,7 +21,7 @@ export class LLMProcessor {
     
     this.connectors = {
       [ELLMProvider.Anthropic]: new AnthropicConnector(this.envConfig),
-      [ELLMProvider.OpenAI]: new OpenAIConnector(this.envConfig.OPENAI_ASSISTANT_VALVE_ID, this.envConfig),
+      [ELLMProvider.OpenAI]: new OpenAIConnector(this.envConfig),
       [ELLMProvider.DeepSeek]: new DeepSeekConnector(this.envConfig),
       [ELLMProvider.Grok]: new GrokConnector(this.envConfig),
     }

@@ -4,7 +4,6 @@ export interface IEnvOptions {
   // API Keys
   ANTHROPIC_API_KEY?: string;
   OPENAI_KEY?: string;
-  OPENAI_ASSISTANT_VALVE_ID?: string;
   DEEPSEEK_KEY?: string;
   GROK_KEY?: string;
   

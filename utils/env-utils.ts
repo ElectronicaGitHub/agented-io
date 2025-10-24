@@ -35,7 +35,6 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     // API Keys
     ANTHROPIC_API_KEY: getEnvValue('ANTHROPIC_API_KEY', envOptions, ''),
     OPENAI_KEY: getEnvValue('OPENAI_KEY', envOptions, ''),
-    OPENAI_ASSISTANT_VALVE_ID: getEnvValue('OPENAI_ASSISTANT_VALVE_ID', envOptions, ''),
     DEEPSEEK_KEY: getEnvValue('DEEPSEEK_KEY', envOptions, ''),
     GROK_KEY: getEnvValue('GROK_KEY', envOptions, ''),
     
