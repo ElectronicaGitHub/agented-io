@@ -1,5 +1,5 @@
 import { OpenAI } from 'openai';
-import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector, IEnvOptions } from '../interfaces';
+import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector, IEnvOptions, ISplitPrompt } from '../interfaces';
 
 export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector {
   private client: OpenAI;
@@ -15,7 +15,7 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
     });
   }
 
-  async sendChatMessage(prompt: string, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
+  async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.OPENAI_MODEL;
     this.client.apiKey = envConfig.OPENAI_KEY;
@@ -23,11 +23,17 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
     try {
       const response = await this.client.chat.completions.create({
         model: actualModel,
-        messages: [{
+        messages: typeof prompt === 'string' ? [{
           role: 'user',
           content: prompt
-        }]
+        }] : [
+          { role: 'system', content: prompt.cacheable },
+          { role: 'user', content: prompt.nonCacheable }
+        ],
       }, { signal });
+
+      console.log('[OpenAI Connector] response.usage', response.usage);
+
       const result = response.choices[0].message.content;
       return { result: result as string };
     } catch (error: any) {
