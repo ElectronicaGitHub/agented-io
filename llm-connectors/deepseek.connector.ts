@@ -9,8 +9,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
     this.getEnvConfig = getEnvConfig;
     const envConfig = this.getEnvConfig();
     this.client = new OpenAI({
-      // baseURL: 'https://api.deepseek.com',
-      baseURL: 'http://localhost:3001',
+      baseURL: 'https://api.deepseek.com',
       apiKey: envConfig.DEEPSEEK_KEY,
     });
   }
