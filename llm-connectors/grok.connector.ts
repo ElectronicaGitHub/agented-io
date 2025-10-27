@@ -3,16 +3,21 @@ import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } fr
 
 export class GrokConnector implements ISimpleLLMConnector {
   private client: OpenAI;
+  private getEnvConfig: () => Required<IEnvOptions>;
 
-  constructor(private envConfig: Required<IEnvOptions>) {
+  constructor(getEnvConfig: () => Required<IEnvOptions>) {
+    this.getEnvConfig = getEnvConfig;
+    const envConfig = this.getEnvConfig();
     this.client = new OpenAI({
       baseURL: 'https://api.x.ai/v1',
-      apiKey: this.envConfig.GROK_KEY,
+      apiKey: envConfig.GROK_KEY,
     });
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || this.envConfig.GROK_MODEL;
+    const envConfig = this.getEnvConfig();
+    const actualModel = model || envConfig.GROK_MODEL;
+    this.client.apiKey = envConfig.GROK_KEY;
     
     if (typeof prompt === 'string') {
       console.log(`[GrokConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
@@ -47,8 +52,15 @@ export class GrokConnector implements ISimpleLLMConnector {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };
       }
-      console.error('Error calling Grok:', error.message);
-      return { error: 'Error calling Grok' };
+      
+      // Extract HTTP status from error if available
+      const httpStatus = error?.status || error?.response?.status;
+      console.error('Error calling Grok:', error.message, 'Status:', httpStatus);
+      
+      return { 
+        error: 'Error calling Grok',
+        httpStatus: httpStatus
+      };
     }
   }
 }

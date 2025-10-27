@@ -68,9 +68,14 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     DEFAULT_PING_INTERVAL: getEnvValue('DEFAULT_PING_INTERVAL', envOptions, 10000),
     MAX_RETRY_COUNT: getEnvValue('MAX_RETRY_COUNT', envOptions, 3),
     RETRY_BACKOFF_MULTIPLIER: getEnvValue('RETRY_BACKOFF_MULTIPLIER', envOptions, 1.5),
+
+    ADD_ERRORS_TO_MESSAGES: getEnvValue('ADD_ERRORS_TO_MESSAGES', envOptions, false),
     
     // Debug Settings
     LOG_PROMPT: getEnvValue('LOG_PROMPT', envOptions, false),
     LOG_RESPONSE: getEnvValue('LOG_RESPONSE', envOptions, false),
+    
+    // HTTP Status Event Settings
+    statusesForEventRaise: getEnvValue('statusesForEventRaise', envOptions, []),
   };
 }

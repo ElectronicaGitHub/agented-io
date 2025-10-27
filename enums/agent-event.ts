@@ -7,5 +7,6 @@ export enum EAgentEvent {
   STATUS_CHANGED = 'status_changed',
   PING = 'ping',
   PONG = 'pong',
-  REQUEST_LAST_RESPONSE = 'request_last_response'
+  REQUEST_LAST_RESPONSE = 'request_last_response',
+  LLM_STATUS_ERROR = 'llm_status_error'
 }

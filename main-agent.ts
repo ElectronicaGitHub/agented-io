@@ -27,6 +27,23 @@ export class MainAgent implements IMainAgent {
     this.envConfig = getEnvConfig(envOptions);
   }
 
+  /**
+   * Update environment options dynamically
+   * This will update the envConfig and all agents/processors will get the new config
+   */
+  updateEnvOptions(newOptions: Partial<IEnvOptions>): void {
+    this.envOptions = { ...this.envOptions, ...newOptions };
+    this.envConfig = getEnvConfig(this.envOptions);
+    console.log('[MainAgent] Environment options updated');
+  }
+
+  /**
+   * Get current environment configuration
+   */
+  getEnvConfig(): Required<IEnvOptions> {
+    return this.envConfig;
+  }
+
   init() {
     console.log('[MainAgent.constructor] Agent started');
     this.initAgent(this.agentSchema);
@@ -82,6 +99,21 @@ export class MainAgent implements IMainAgent {
       senderType: 'user',
       createdAt: new Date() 
     });
+  }
+
+  /**
+   * Retry the last message processing
+   * This will retry the last processed message on the main agent
+   */
+  retryLastMessage(): void {
+    const mainAgent = this.agents[0];
+    if (!mainAgent) {
+      console.warn('[MainAgent] No main agent found to retry');
+      return;
+    }
+    
+    console.log('[MainAgent] Retrying last message on main agent');
+    mainAgent.retryLastItem();
   }
 
   getAgentSchema(): IAgentSchema {

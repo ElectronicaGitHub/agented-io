@@ -3,16 +3,22 @@ import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } fr
 
 export class DeepSeekConnector implements ISimpleLLMConnector {
   private client: OpenAI;
+  private getEnvConfig: () => Required<IEnvOptions>;
 
-  constructor(private envConfig: Required<IEnvOptions>) {
+  constructor(getEnvConfig: () => Required<IEnvOptions>) {
+    this.getEnvConfig = getEnvConfig;
+    const envConfig = this.getEnvConfig();
     this.client = new OpenAI({
-      baseURL: 'https://api.deepseek.com',
-      apiKey: this.envConfig.DEEPSEEK_KEY,
+      // baseURL: 'https://api.deepseek.com',
+      baseURL: 'http://localhost:3001',
+      apiKey: envConfig.DEEPSEEK_KEY,
     });
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || this.envConfig.DEEPSEEK_MODEL;
+    const envConfig = this.getEnvConfig();
+    const actualModel = model || envConfig.DEEPSEEK_MODEL;
+    this.client.apiKey = envConfig.DEEPSEEK_KEY;
     
     if (typeof prompt === 'string') {
       console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
@@ -47,8 +53,15 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };
       }
-      console.error('Error calling DeepSeek:', error.message);
-      return { error: 'Error calling DeepSeek' };
+      
+      // Extract HTTP status from error if available
+      const httpStatus = error?.status || error?.response?.status;
+      console.error('Error calling DeepSeek:', error.message, 'Status:', httpStatus);
+      
+      return { 
+        error: 'Error calling DeepSeek',
+        httpStatus: httpStatus
+      };
     }
   }
 }

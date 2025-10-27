@@ -11,19 +11,24 @@ import { getEnvConfig } from '../utils/env-utils';
 
 export class LLMProcessor {
   private connectors: Partial<Record<ELLMProvider, ISimpleLLMConnector>>;
-  private envConfig: Required<IEnvOptions>;
+  private getEnvConfigFn: () => Required<IEnvOptions>;
   private lastWorkingProvider: ELLMProvider;
+  private onStatusError?: (data: { status: number; provider: ELLMProvider; error?: string; timestamp: Date }) => void;
 
-  constructor(envConfig?: Required<IEnvOptions>) {
-    // If envConfig is provided, use it; otherwise create from process.env
-    this.envConfig = envConfig || getEnvConfig();
-    this.lastWorkingProvider = this.envConfig.LLM_PROVIDER;
+  constructor(
+    getEnvConfigFn?: () => Required<IEnvOptions>, 
+    onStatusError?: (data: { status: number; provider: ELLMProvider; error?: string; timestamp: Date }) => void
+  ) {
+    // If getEnvConfigFn is provided, use it; otherwise create a function that reads from process.env
+    this.getEnvConfigFn = getEnvConfigFn || (() => getEnvConfig());
+    this.lastWorkingProvider = this.getEnvConfigFn().LLM_PROVIDER;
+    this.onStatusError = onStatusError;
     
     this.connectors = {
-      [ELLMProvider.Anthropic]: new AnthropicConnector(this.envConfig),
-      [ELLMProvider.OpenAI]: new OpenAIConnector(this.envConfig),
-      [ELLMProvider.DeepSeek]: new DeepSeekConnector(this.envConfig),
-      [ELLMProvider.Grok]: new GrokConnector(this.envConfig),
+      [ELLMProvider.Anthropic]: new AnthropicConnector(() => this.getEnvConfigFn()),
+      [ELLMProvider.OpenAI]: new OpenAIConnector(() => this.getEnvConfigFn()),
+      [ELLMProvider.DeepSeek]: new DeepSeekConnector(() => this.getEnvConfigFn()),
+      [ELLMProvider.Grok]: new GrokConnector(() => this.getEnvConfigFn()),
     }
   }
 
@@ -34,12 +39,13 @@ export class LLMProcessor {
     signal?: AbortSignal
   ): Promise<{
     result: string;
+    httpStatus?: number;
     metadata: {
       inputTokens: number;
       outputTokens: number;
     };
   }> {
-    const actualProvider = provider || this.envConfig.FAST_REQUEST_LLM_PROVIDER;
+    const actualProvider = provider || this.getEnvConfigFn().FAST_REQUEST_LLM_PROVIDER;
     try {
       const connector = this.connectors[actualProvider];
       if (!connector) {
@@ -47,8 +53,20 @@ export class LLMProcessor {
       }
 
       const response = await connector.sendChatMessage(text, model, signal);
+      
+      // Check if we need to call callback for this HTTP status
+      if (response.httpStatus && this.getEnvConfigFn().statusesForEventRaise.includes(response.httpStatus)) {
+        this.onStatusError?.({
+          status: response.httpStatus,
+          provider: actualProvider,
+          error: response.error,
+          timestamp: new Date()
+        });
+      }
+      
       return {
         result: response.result || '',
+        httpStatus: response.httpStatus,
         metadata: {
           inputTokens: typeof text === 'string' ? text.length : text.cacheable.length,
           outputTokens: response.result?.length || 0
@@ -88,14 +106,15 @@ export class LLMProcessor {
       outputTokens: number;
     };
   }> {
-    const actualStartingProvider = startingProvider || this.envConfig.LLM_PROVIDER;
+    const envConfig = this.getEnvConfigFn();
+    const actualStartingProvider = startingProvider || envConfig.LLM_PROVIDER;
     const providersToTry = [actualStartingProvider];
     
     const substituteMap = {
-      [ELLMProvider.OpenAI]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_OPENAI],
-      [ELLMProvider.Anthropic]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC],
-      [ELLMProvider.DeepSeek]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK],
-      [ELLMProvider.Grok]: [this.envConfig.LLM_CONNECTORS_SUBSTITUTE_GROK],
+      [ELLMProvider.OpenAI]: [envConfig.LLM_CONNECTORS_SUBSTITUTE_OPENAI],
+      [ELLMProvider.Anthropic]: [envConfig.LLM_CONNECTORS_SUBSTITUTE_ANTHROPIC],
+      [ELLMProvider.DeepSeek]: [envConfig.LLM_CONNECTORS_SUBSTITUTE_DEEPSEEK],
+      [ELLMProvider.Grok]: [envConfig.LLM_CONNECTORS_SUBSTITUTE_GROK],
     };
     const substitutes = substituteMap[actualStartingProvider as keyof typeof substituteMap] || [];
     for (const provider of substitutes) {
@@ -105,12 +124,20 @@ export class LLMProcessor {
     }
 
     for (const currentProvider of providersToTry) {
-      const [result, error] = await this.tryLLMProviderSendMessage(currentProvider, message, allowString, signal);
+      const [result, error, shouldStopRetry] = await this.tryLLMProviderSendMessage(currentProvider, message, allowString, signal);
       if (!error && result) {
         this.lastWorkingProvider = currentProvider;
         return result;
       } else {
-        console.warn(`Provider ${currentProvider} failed:`, error?.message);
+        console.warn(`[LLMProcessor] Provider ${currentProvider} failed:`, error?.message);
+        // If we should stop retry (e.g., status in statusesForEventRaise), throw immediately
+        if (shouldStopRetry) {
+          console.log(`[LLMProcessor] Stopping retry due to status event from ${currentProvider}`);
+          throw error ? { 
+            message: error.message, 
+            shouldStopRetry: true
+          } : new Error('Request stopped due to status event');
+        }
       }
     }
     throw new Error(`No response from any provider`);
@@ -121,7 +148,7 @@ export class LLMProcessor {
     message: string | ISplitPrompt, 
     allowString: boolean = false,
     signal?: AbortSignal
-  ): Promise<[any, Error | null]> {
+  ): Promise<[any, Error | null, boolean]> {
     try {
       let originalLength: number;
       let cleanedMessage: string | ISplitPrompt;
@@ -140,7 +167,8 @@ export class LLMProcessor {
       console.log(`[LLMProcessor.tryLLMProviderSendMessage] Sending request to ${provider} with message length: ${cleanedLength} (was ${originalLength}, removed ${originalLength - cleanedLength} characters)`);
       
       // Log prompt if enabled
-      if (this.envConfig.LOG_PROMPT) {
+      const envConfig = this.getEnvConfigFn();
+      if (envConfig.LOG_PROMPT) {
         console.log('\n=== LLM PROMPT START ===');
         if (typeof cleanedMessage === 'string') {
           console.log(cleanedMessage);
@@ -160,16 +188,24 @@ export class LLMProcessor {
       const sendPromise = this.sendMessage(cleanedMessage, provider, undefined, signal);
       const response = await withTimeout(
         sendPromise,
-        this.envConfig.LLM_RESULT_TIMEOUT_MS,
+        envConfig.LLM_RESULT_TIMEOUT_MS,
         `LLM ${provider} request timeout`
       );
 
+      // Check if we should stop retry due to status event
+      const shouldStopRetry = response.httpStatus && envConfig.statusesForEventRaise.includes(response.httpStatus);
+
+      if (shouldStopRetry) {
+        return [null, new Error(`LLM ${provider} request failed with status ${response.httpStatus}`), true];
+      }
+
       if (!response.result) {
-        throw new Error('Empty response from LLM');
+        console.log('Empty response from LLM');
+        return [null, new Error('Empty response from LLM'), shouldStopRetry || false];
       }
       
       // Log response if enabled
-      if (this.envConfig.LOG_RESPONSE) {
+      if (envConfig.LOG_RESPONSE) {
         console.log('\n=== LLM RESPONSE START ===');
         console.log(response.result);
         console.log('=== LLM RESPONSE END ===\n');
@@ -185,14 +221,17 @@ export class LLMProcessor {
         return [{
           result: parsedResponse,
           metadata: response.metadata
-        }, null];
+        }, null, false];
       } catch (parseError) {
         console.error('Error parsing JSON response:', parseError);
-        return [null, parseError as Error];
+        return [null, parseError as Error, shouldStopRetry || false];
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log(`${new Date().toUTCString()} | Error when getting response from ${provider}:`, error);
-      return [null, error as Error];
+      // Check if error has httpStatus that should stop retry
+      const envConfig = this.getEnvConfigFn();
+      const shouldStopRetry = error?.httpStatus && envConfig.statusesForEventRaise.includes(error.httpStatus);
+      return [null, error as Error, shouldStopRetry || false];
     }
   }
 
