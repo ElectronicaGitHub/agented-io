@@ -3,17 +3,21 @@ import { IEmbeddingConnector, ILLMResultResponse, ISimpleLLMConnector, IEnvOptio
 
 export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector {
   private client: OpenAI;
+  private getEnvConfig: () => Required<IEnvOptions>;
 
   constructor(
-    private envConfig: Required<IEnvOptions>,
+    getEnvConfig: () => Required<IEnvOptions>,
   ) {
+    this.getEnvConfig = getEnvConfig;
+    const envConfig = this.getEnvConfig();
     this.client = new OpenAI({
-      apiKey: this.envConfig.OPENAI_KEY,
+      apiKey: envConfig.OPENAI_KEY,
     });
   }
 
   async sendChatMessage(prompt: string, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || this.envConfig.OPENAI_MODEL;
+    const envConfig = this.getEnvConfig();
+    const actualModel = model || envConfig.OPENAI_MODEL;
     try {
       const response = await this.client.chat.completions.create({
         model: actualModel,
@@ -24,19 +28,27 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
       }, { signal });
       const result = response.choices[0].message.content;
       return { result: result as string };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };
       }
-      console.error('Error calling OpenAI:', error);
-      return { error: 'Error calling OpenAI' };
+      
+      // Extract HTTP status from error if available
+      const httpStatus = error?.status || error?.response?.status;
+      console.error('Error calling OpenAI:', error, 'Status:', httpStatus);
+      
+      return { 
+        error: 'Error calling OpenAI',
+        httpStatus: httpStatus
+      };
     }
   }
 
   async getEmbeddings(text: string): Promise<number[]> {
     try {
+      const envConfig = this.getEnvConfig();
       const response = await this.client.embeddings.create({
-        model: this.envConfig.OPENAI_EMBEDDING_MODEL,
+        model: envConfig.OPENAI_EMBEDDING_MODEL,
         input: text,
       });
       return response.data[0].embedding;

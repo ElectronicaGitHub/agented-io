@@ -127,7 +127,13 @@ export class Agent implements IAgent {
     this.functions = agentSchema.functions || [];
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
-    this.llmProcessor = new LLMProcessor(this.mainAgent?.envConfig);
+    this.llmProcessor = new LLMProcessor(
+      this.mainAgent ? () => this.mainAgent!.getEnvConfig() : undefined,
+      (data) => {
+        console.log('[Agent] status event callback', data);
+        this.emit(EAgentEvent.LLM_STATUS_ERROR, data);
+      }
+    );
     this.processQueue = new SimpleQueue((item, signal) => this.processItem(item, signal));
     this.parentAgent = parentAgent;
 
@@ -474,8 +480,13 @@ export class Agent implements IAgent {
 
           response = result;
           break;
-        } catch (error) {
-          console.error(`[Agent ${this.name}] Error getting LLM response (attempt ${retryCount + 1}/${this.maxRetries}):`, error);
+        } catch (error: any & { shouldStopRetry?: boolean }) {
+          console.error(`[Agent ${this.name}] Error getting LLM response (attempt ${retryCount + 1}/${this.maxRetries}):`);
+
+          if (error?.shouldStopRetry) {
+            throw error;
+          }
+
           retryCount++;
           if (retryCount === this.maxRetries) {
             throw error;

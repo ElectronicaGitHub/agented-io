@@ -41,4 +41,7 @@ export interface IEnvOptions {
   // Debug Settings
   LOG_PROMPT?: boolean;
   LOG_RESPONSE?: boolean;
+  
+  // HTTP Status Event Settings
+  statusesForEventRaise?: number[];
 }

@@ -4,17 +4,19 @@ import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } fr
 
 export class AnthropicConnector implements ISimpleLLMConnector {
   private client: Anthropic;
-  private model: string;
+  private getEnvConfig: () => Required<IEnvOptions>;
 
-  constructor(private envConfig: Required<IEnvOptions>) {
+  constructor(getEnvConfig: () => Required<IEnvOptions>) {
+    this.getEnvConfig = getEnvConfig;
+    const envConfig = this.getEnvConfig();
     this.client = new Anthropic({
-      apiKey: this.envConfig.ANTHROPIC_API_KEY,
+      apiKey: envConfig.ANTHROPIC_API_KEY,
     });
-    this.model = this.envConfig.ANTHROPIC_MODEL;
   }
 
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
-    const actualModel = model || this.model;
+    const envConfig = this.getEnvConfig();
+    const actualModel = model || envConfig.ANTHROPIC_MODEL;
     if (typeof prompt === 'string') {
       console.log('[Anthropic Connector] prompt length', prompt.length);
     } else {
@@ -53,12 +55,19 @@ export class AnthropicConnector implements ISimpleLLMConnector {
       
       const textResult = (response.content[0] as TextBlock).text;
       return { result: textResult };
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };
       }
-      console.error('Error calling Anthropic:', error);
-      return { error: 'Error calling Anthropic' };
+      
+      // Extract HTTP status from error if available
+      const httpStatus = error?.status || error?.response?.status;
+      console.error('Error calling Anthropic:', error, 'Status:', httpStatus);
+      
+      return { 
+        error: 'Error calling Anthropic',
+        httpStatus: httpStatus
+      };
     }
   }
 
