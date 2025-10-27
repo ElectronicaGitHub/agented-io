@@ -30,6 +30,7 @@ import {
   IMarketplaceFunctionDefinition,
   IAgentMessage,
   IAgentCtx,
+  IAgentMixin,
   IAgentSchema,
   IAgentUnitedFunction,
   IUpdatedContext,
@@ -396,6 +397,19 @@ export class Agent implements IAgent {
   getMessagesAsText(): string[] {
     const limit = this.mainAgent?.envConfig.PROMPT_LAST_MESSAGES_N || 15;
     return this.messages.map(msg => `${msg.sender}: ${msg.text}`).slice(-limit);
+  }
+
+  setMixin(mixin: IAgentMixin, clear: boolean = false): void {
+    const mixins = (clear 
+      ? [] 
+      : this.agentSchema.mixins
+    ) || [];
+    mixins.push(mixin);
+    this.agentSchema.mixins = mixins;
+  }
+
+  clearMixins(): void {
+    this.agentSchema.mixins = [];
   }
 
   setMessages(messages: IAgentMessage[]) {

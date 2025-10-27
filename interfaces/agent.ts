@@ -1,6 +1,7 @@
 import { EAgentStatus } from '../enums';
 import { IAgentFunctionDefinition, IMarketplaceFunctionDefinition } from './agent-function';
 import { IAgentMessage } from './agent-message';
+import { IAgentMixin } from './agent-schema';
 import { ISplitPrompt } from './agent-split-prompt';
 
 export interface IAgent {
@@ -15,6 +16,9 @@ export interface IAgent {
   process(text: string, role: string): void;
   retryLastItem(): void;
   init(): Promise<void>;
+
+  setMixin(mixin: IAgentMixin, clear: boolean): void;
+  clearMixins(): void;
   
   // Additional properties needed for compatibility
   currentStatus: EAgentStatus;
