@@ -18,6 +18,8 @@ const mainAgent = new MainAgent(
   {
     DEEPSEEK_KEY: 'test-key',
     DEEPSEEK_MODEL: 'deepseek-chat',
+    LOG_PROMPT: true,
+    LOG_RESPONSE: true,
     LLM_PROVIDER: ELLMProvider.DeepSeek,
     statusesForEventRaise: [429],
   }
@@ -34,17 +36,30 @@ async function runTest() {
 
   // Listen for LLM_STATUS_ERROR event
   const listener = mainAgent.getAgent('TestAgent');
-  listener?.on(EAgentEvent.LLM_STATUS_ERROR, (data: { status: number; provider: string; error?: string; timestamp: Date }) => {
+  listener?.on(EAgentEvent.LLM_STATUS_ERROR, async (data: { status: number; provider: string; error?: string; timestamp: Date }) => {
     console.log('\n=== LLM_STATUS_ERROR EVENT RECEIVED ===');
     console.log('Status:', data.status);
     console.log('Provider:', data.provider);
     console.log('Error:', data.error);
     console.log('Timestamp:', data.timestamp);
     console.log('=======================================\n');
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('=======================================\n');
+    console.log('=======================================\n');
+
+    setTimeout(() => {
+      mainAgent.updateEnvOptions({
+        DEEPSEEK_KEY: 'DEEPSEET UPDATED KEY'
+      });
+      mainAgent.retryLastMessage();
+    }, 1000);
   });
   
   // Send a message that will trigger the LLM call
-  mainAgent.sendMessage('Hello, test message');
+  setTimeout(() => {
+    mainAgent.sendMessage('Hello, test message');
+  }, 100);
   
   // Keep the process alive to see the event
   setTimeout(() => {

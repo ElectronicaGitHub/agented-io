@@ -13,6 +13,7 @@ export interface IMainAgent {
   process(item: IAgentMessage): void;
   init(): void;
   sendMessage(text: string, role: string): void;
+  retryLastMessage(): void;
   on(event: EAgentEvent, callback: (data: any) => void): void;
   removeListener(event: EAgentEvent, callback: (data: any) => void): void;
 

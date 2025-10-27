@@ -18,6 +18,8 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
   async sendChatMessage(prompt: string, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.OPENAI_MODEL;
+    this.client.apiKey = envConfig.OPENAI_KEY;
+    
     try {
       const response = await this.client.chat.completions.create({
         model: actualModel,

@@ -101,6 +101,21 @@ export class MainAgent implements IMainAgent {
     });
   }
 
+  /**
+   * Retry the last message processing
+   * This will retry the last processed message on the main agent
+   */
+  retryLastMessage(): void {
+    const mainAgent = this.agents[0];
+    if (!mainAgent) {
+      console.warn('[MainAgent] No main agent found to retry');
+      return;
+    }
+    
+    console.log('[MainAgent] Retrying last message on main agent');
+    mainAgent.retryLastItem();
+  }
+
   getAgentSchema(): IAgentSchema {
     return {
       ...this.agentSchema,

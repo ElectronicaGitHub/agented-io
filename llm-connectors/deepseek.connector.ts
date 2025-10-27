@@ -18,6 +18,7 @@ export class DeepSeekConnector implements ISimpleLLMConnector {
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.DEEPSEEK_MODEL;
+    this.client.apiKey = envConfig.DEEPSEEK_KEY;
     
     if (typeof prompt === 'string') {
       console.log(`[DeepSeekConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);

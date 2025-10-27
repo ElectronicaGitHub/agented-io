@@ -17,6 +17,8 @@ export class AnthropicConnector implements ISimpleLLMConnector {
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.ANTHROPIC_MODEL;
+    this.client.apiKey = envConfig.ANTHROPIC_API_KEY;
+    
     if (typeof prompt === 'string') {
       console.log('[Anthropic Connector] prompt length', prompt.length);
     } else {

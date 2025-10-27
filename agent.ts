@@ -379,6 +379,20 @@ export class Agent implements IAgent {
     });
   }
 
+  retryLastItem(): void {
+    console.log(`[Agent ${this.name}] Retrying last processed item`);
+  
+    this.cleanup();
+    this.setStatus(EAgentStatus.IDLE);
+    
+    this.processQueue.enqueue({
+      text: '',
+      sender: '',
+      senderType: this.agentSchema.type,
+      createdAt: new Date(),
+    });
+  }
+
   getMessagesAsText(): string[] {
     const limit = this.mainAgent?.envConfig.PROMPT_LAST_MESSAGES_N || 15;
     return this.messages.map(msg => `${msg.sender}: ${msg.text}`).slice(-limit);
@@ -579,13 +593,15 @@ export class Agent implements IAgent {
     } catch (error: any) {
       console.error(`Error in agent ${this.name}:`, error.message);
       this.setStatus(EAgentStatus.ERROR, error.message);
-      this.addMessages([{
-        text: error.message,
-        sender: this.name,
-        senderType: this.agentSchema.type,
-        createdAt: new Date(),
-        type: EAgentResponseType.TEXT,
-      }]);
+      if (this.mainAgent?.envConfig.ADD_ERRORS_TO_MESSAGES) {
+        this.addMessages([{
+          text: error.message,
+          sender: this.name,
+          senderType: this.agentSchema.type,
+          createdAt: new Date(),
+          type: EAgentResponseType.TEXT,
+        }]);
+      }
     }
   }
 

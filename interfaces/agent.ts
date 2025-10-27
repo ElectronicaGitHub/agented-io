@@ -13,6 +13,7 @@ export interface IAgent {
   
   preRequestBuildSplitPrompt(prompt: string, messages: string[], mixinsResult?: string): Promise<ISplitPrompt>;
   process(text: string, role: string): void;
+  retryLastItem(): void;
   init(): Promise<void>;
   
   // Additional properties needed for compatibility

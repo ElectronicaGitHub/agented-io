@@ -87,6 +87,8 @@ DEFAULT_WORK_TIMEOUT=60000                # Default work timeout (60 seconds)
 DEFAULT_PING_INTERVAL=10000               # Ping interval (10 seconds)
 MAX_RETRY_COUNT=3                         # Max retry count for agent operations
 RETRY_BACKOFF_MULTIPLIER=1.5              # Backoff multiplier for retries
+
+ADD_ERRORS_TO_MESSAGES=true               # Add errors to messages
 ```
 
 #### Debug Settings

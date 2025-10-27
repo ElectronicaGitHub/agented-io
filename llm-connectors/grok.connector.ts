@@ -17,6 +17,7 @@ export class GrokConnector implements ISimpleLLMConnector {
   async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.GROK_MODEL;
+    this.client.apiKey = envConfig.GROK_KEY;
     
     if (typeof prompt === 'string') {
       console.log(`[GrokConnector.sendChatMessage] Sending request to ${actualModel}`, prompt.length);
