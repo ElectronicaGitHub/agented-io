@@ -7,7 +7,7 @@ import { ELLMProvider } from '../consts';
 const testAgentSchema: IAgentSchema = {
   id: 'test-agent-1',
   name: 'TestAgent',
-  prompt: 'You are a test agent',
+  prompt: 'You are a test agent, respond with a joke',
   type: 'permanent' as any,
 };
 
@@ -17,10 +17,9 @@ const mainAgent = new MainAgent(
   testAgentSchema,
   {
     DEEPSEEK_KEY: 'test-key',
-    DEEPSEEK_MODEL: 'deepseek-chat',
+    LLM_PROVIDER: ELLMProvider.DeepSeek,
     LOG_PROMPT: true,
     LOG_RESPONSE: true,
-    LLM_PROVIDER: ELLMProvider.DeepSeek,
     statusesForEventRaise: [429],
   }
 );
@@ -31,8 +30,8 @@ async function runTest() {
   mainAgent.init();
   
   console.log('[Test] Sending test message...');
-  console.log('[Test] Make sure the test server is running on http://localhost:3001');
-  console.log('[Test] And DeepSeek connector is configured to use http://localhost:3001 as baseURL\n');
+  // console.log('[Test] Make sure the test server is running on http://localhost:3001');
+  // console.log('[Test] And DeepSeek connector is configured to use http://localhost:3001 as baseURL\n');
 
   // Listen for LLM_STATUS_ERROR event
   const listener = mainAgent.getAgent('TestAgent');
@@ -50,10 +49,32 @@ async function runTest() {
 
     setTimeout(() => {
       mainAgent.updateEnvOptions({
-        DEEPSEEK_KEY: 'DEEPSEET UPDATED KEY'
+        DEEPSEEK_KEY: 'DEEPSEEK UPDATED KEY'
       });
       mainAgent.retryLastMessage();
     }, 1000);
+  });
+
+  // Listen for MAIN_RESPONSE event to check token usage
+  listener?.on(EAgentEvent.MAIN_RESPONSE, (event: any) => {
+    console.log('\n=== MAIN_RESPONSE EVENT RECEIVED ===');
+    console.log('Sender:', event.sender);
+    console.log('Text:', event.text.substring(0, 100) + (event.text.length > 100 ? '...' : ''));
+    console.log('Token Usage:');
+    if (event.metadata) {
+      console.log('  Model Used:', event.metadata.modelUsed);
+      console.log('  Input Tokens:', event.metadata.inputTokens);
+      console.log('  Output Tokens:', event.metadata.outputTokens);
+      console.log('  Cached Tokens:', event.metadata.cachedTokens);
+      console.log('  Non-Cached Tokens:', event.metadata.nonCachedTokens);
+      console.log('  Symbol per Token:', event.metadata.symbolPerToken);
+      if (event.metadata.providerRawUsage) {
+        console.log('  Raw Usage:', JSON.stringify(event.metadata.providerRawUsage, null, 2));
+      }
+    } else {
+      console.log('  No metadata available');
+    }
+    console.log('=====================================\n');
   });
   
   // Send a message that will trigger the LLM call
