@@ -1,7 +1,7 @@
 import { jsonrepair } from 'jsonrepair';
 import { saveJsonToFileAsync } from '../utils/file-utils';
 import { ELLMProvider, LAST_LLM_RESULT_RAW_FILENAME } from '../consts';
-import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
+import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions, ILLMUsageMetadata } from '../interfaces';
 import { AnthropicConnector } from '../llm-connectors/anthropic.connector';
 import { DeepSeekConnector } from '../llm-connectors/deepseek.connector';
 import { GrokConnector } from '../llm-connectors/grok.connector';
@@ -40,10 +40,7 @@ export class LLMProcessor {
   ): Promise<{
     result: string;
     httpStatus?: number;
-    metadata: {
-      inputTokens: number;
-      outputTokens: number;
-    };
+    metadata: ILLMUsageMetadata;
   }> {
     const actualProvider = provider || this.getEnvConfigFn().FAST_REQUEST_LLM_PROVIDER;
     try {
@@ -67,9 +64,13 @@ export class LLMProcessor {
       return {
         result: response.result || '',
         httpStatus: response.httpStatus,
-        metadata: {
-          inputTokens: typeof text === 'string' ? text.length : text.cacheable.length,
-          outputTokens: response.result?.length || 0
+        metadata: response.metadata || {
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedTokens: 0,
+          nonCachedTokens: 0,
+          modelUsed: '',
+          symbolPerToken: undefined,
         }
       };
     } catch (error) {
@@ -80,10 +81,7 @@ export class LLMProcessor {
 
   async getLLMResultSendMessage(message: string | ISplitPrompt, allowString: boolean = false, signal?: AbortSignal): Promise<{
     result: any;
-    metadata: {
-      inputTokens: number;
-      outputTokens: number;
-    };
+    metadata: ILLMUsageMetadata;
   }> {
     try {
       const result = await this.tryMultipleProvidersSendMessage(message, this.lastWorkingProvider, allowString, signal);
@@ -101,10 +99,7 @@ export class LLMProcessor {
     signal?: AbortSignal
   ): Promise<{
     result: string;
-    metadata: {
-      inputTokens: number;
-      outputTokens: number;
-    };
+    metadata: ILLMUsageMetadata;
   }> {
     const envConfig = this.getEnvConfigFn();
     const actualStartingProvider = startingProvider || envConfig.LLM_PROVIDER;

@@ -35,7 +35,23 @@ export class OpenAIConnector implements ISimpleLLMConnector, IEmbeddingConnector
       console.log('[OpenAI Connector] response.usage', response.usage);
 
       const result = response.choices[0].message.content;
-      return { result: result as string };
+
+      // Extract usage metadata
+      const usage = response.usage;
+      const totalSymbols = typeof prompt === 'string' ? prompt.length : prompt.cacheable.length + prompt.nonCacheable.length;
+      const cachedTokens = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+      const inputTokens = usage?.prompt_tokens ?? 0;
+      const metadata = {
+        inputTokens,
+        outputTokens: usage?.completion_tokens ?? 0,
+        cachedTokens,
+        nonCachedTokens: inputTokens - cachedTokens,
+        modelUsed: response.model || actualModel,
+        symbolPerToken: inputTokens > 0 ? totalSymbols / inputTokens : undefined,
+        providerRawUsage: usage
+      };
+
+      return { result: result as string, metadata };
     } catch (error: any) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };

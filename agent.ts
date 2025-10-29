@@ -30,6 +30,7 @@ import {
   IMarketplaceFunctionDefinition,
   IAgentMessage,
   IAgentCtx,
+  IAgentMixin,
   IAgentSchema,
   IAgentUnitedFunction,
   IUpdatedContext,
@@ -41,6 +42,7 @@ import {
   IAgentResponseText,
   IAgentResponseMultipleFunctions,
   ISplitPrompt,
+  ILLMUsageMetadata,
 } from './interfaces';
 import { IFunctionsStoreService } from './interfaces/functions-store-service.interface';
 import { createAgentFactory } from './utils/agent-factory';
@@ -398,6 +400,19 @@ export class Agent implements IAgent {
     return this.messages.map(msg => `${msg.sender}: ${msg.text}`).slice(-limit);
   }
 
+  setMixin(mixin: IAgentMixin, clear: boolean = false): void {
+    const mixins = (clear 
+      ? [] 
+      : this.agentSchema.mixins
+    ) || [];
+    mixins.push(mixin);
+    this.agentSchema.mixins = mixins;
+  }
+
+  clearMixins(): void {
+    this.agentSchema.mixins = [];
+  }
+
   setMessages(messages: IAgentMessage[]) {
     this.addMessages(messages.map(el => ({
       ...el,
@@ -448,10 +463,19 @@ export class Agent implements IAgent {
 
       let retryCount = 0;
       let response: IAgentResponse | undefined;
+      let metadata: ILLMUsageMetadata = {
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
+        nonCachedTokens: 0,
+        modelUsed: ''
+      };
 
       while (retryCount < this.maxRetries) {
         try {
-          const { result, metadata } = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
+          const llmResult = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
+          const { result, metadata: llmMetadata } = llmResult;
+          metadata = llmMetadata;
           
           // Validate response format
           if (typeof result === 'string') {
@@ -517,7 +541,7 @@ export class Agent implements IAgent {
       }
       
       const { stopProcessing, result, agent } = await this.handleResponse(response);
-      const event = this.buildResponseEvent(response, result);
+      const event = this.buildResponseEvent(response, result, metadata);
 
 
       if (stopProcessing) {
@@ -634,7 +658,7 @@ export class Agent implements IAgent {
     };
   }
 
-  private buildResponseEvent(response: IAgentResponse, result?: IAgentFunctionResult): IAgentMessage {
+  private buildResponseEvent(response: IAgentResponse, result?: IAgentFunctionResult, metadata?: ILLMUsageMetadata): IAgentMessage {
     const isCommandResult = Array.isArray(result);
     const text = isCommandResult ? result[0] : (result || '') as string;
     const commands = isCommandResult ? result[1] : [];
@@ -658,10 +682,7 @@ export class Agent implements IAgent {
       functionName,
       name: (response as IAgentResponseAgent).name || '',
       specialInstructions: (response as IAgentResponseAgent).specialInstructions || '',
-      metadata: {
-        inputTokens: this.ctx.inputText.length,
-        outputTokens: text.length
-      }
+      metadata,
     };
     return event;
   }

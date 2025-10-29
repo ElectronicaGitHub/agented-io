@@ -47,7 +47,22 @@ export class GrokConnector implements ISimpleLLMConnector {
       console.log('[Grok Connector] response.usage', response.usage);
       
       const result = response.choices[0].message.content;
-      return { result: result as string };
+
+      // Extract usage metadata (Grok uses OpenAI-compatible format)
+      const usage = response.usage;
+      const totalSymbols = typeof prompt === 'string' ? prompt.length : prompt.cacheable.length + prompt.nonCacheable.length;
+      const inputTokens = usage?.prompt_tokens ?? 0;
+      const metadata = {
+        inputTokens,
+        outputTokens: usage?.completion_tokens ?? 0,
+        cachedTokens: 0, // Grok doesn't have caching yet
+        nonCachedTokens: inputTokens,
+        modelUsed: response.model || actualModel, // Use response.model if available, otherwise actualModel
+        symbolPerToken: inputTokens > 0 ? totalSymbols / inputTokens : undefined,
+        providerRawUsage: usage
+      };
+
+      return { result: result as string, metadata };
     } catch (error: any) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };

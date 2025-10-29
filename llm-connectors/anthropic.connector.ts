@@ -56,7 +56,22 @@ export class AnthropicConnector implements ISimpleLLMConnector {
       console.log('[Anthropic Connector] response.usage', response.usage);
       
       const textResult = (response.content[0] as TextBlock).text;
-      return { result: textResult };
+
+      // Extract usage metadata
+      const usage = response.usage;
+      const totalSymbols = typeof prompt === 'string' ? prompt.length : prompt.cacheable.length + prompt.nonCacheable.length;
+      const inputTokens = (usage?.input_tokens ?? 0) + (usage?.cache_read_input_tokens ?? 0);
+      const metadata = {
+        inputTokens,
+        outputTokens: usage?.output_tokens ?? 0,
+        cachedTokens: usage?.cache_read_input_tokens ?? 0,
+        nonCachedTokens: usage?.input_tokens ?? 0,
+        modelUsed: response.model || actualModel,
+        symbolPerToken: inputTokens > 0 ? totalSymbols / inputTokens : undefined,
+        providerRawUsage: usage
+      };
+
+      return { result: textResult, metadata };
     } catch (error: any) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { error: 'Request aborted' };
