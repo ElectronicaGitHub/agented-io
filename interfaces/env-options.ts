@@ -37,6 +37,7 @@ export interface IEnvOptions {
   DEFAULT_PING_INTERVAL?: number;
   MAX_RETRY_COUNT?: number;
   RETRY_BACKOFF_MULTIPLIER?: number;
+  MULTIPLE_FUNCTIONS_TIMEOUT?: number;
 
   ADD_ERRORS_TO_MESSAGES?: boolean;
   

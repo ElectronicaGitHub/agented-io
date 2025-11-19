@@ -75,7 +75,6 @@ export class Agent implements IAgent {
 
   status: EAgentStatus = EAgentStatus.IDLE;
   private workTimeout?: NodeJS.Timeout;
-  private readonly MULTIPLE_FUNCTIONS_TIMEOUT = 10000; // 10 seconds timeout for multiple functions execution
   private lastError?: string;
 
   private listeners: { [key: string]: ((...args: any[]) => void)[] } = {};
@@ -777,10 +776,14 @@ export class Agent implements IAgent {
     
     const results: string[] = [];
     const promises = multipleFuncRes.functions.map(async (funcRes) => {
+      console.log(`[Agent ${this.name}] Starting function: ${funcRes.functionName}`);
+      const startTime = Date.now();
       try {
         const result = await this.handleFunctionResponse(funcRes);
+        console.log(`[Agent ${this.name}] Completed function: ${funcRes.functionName} in ${Date.now() - startTime}ms`);
         return this.wrapFunctionTextResponse(funcRes, result);
       } catch (error: any) {
+        console.log(`[Agent ${this.name}] Failed function: ${funcRes.functionName} after ${Date.now() - startTime}ms - Error: ${error.message}`);
         return `Error executing function ${funcRes.functionName}: ${error.message}`;
       }
     });
@@ -790,7 +793,7 @@ export class Agent implements IAgent {
       const timeoutPromise = new Promise<string[]>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Functions execution timed out'));
-        }, this.MULTIPLE_FUNCTIONS_TIMEOUT);
+        }, this.mainAgent?.envConfig?.MULTIPLE_FUNCTIONS_TIMEOUT || 10000);
       });
 
       const executionPromise = Promise.all(promises);

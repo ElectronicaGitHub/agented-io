@@ -1,5 +1,6 @@
 import { EAgentResponseType, EAgentStatus } from '../enums';
 import { IAgentResponseMultipleFunctions } from '../interfaces';
+import { getEnvConfig } from '../utils/env-utils';
 
 // Mock dependencies to avoid initialization issues
 jest.mock('../processors/llm-processor');
@@ -68,11 +69,17 @@ describe('Agent Multiple Functions', () => {
     });
   });
 
-  describe('Timeout constant', () => {
-    it('should have correct timeout value', () => {
-      // Test that the timeout constant is defined correctly
-      const MULTIPLE_FUNCTIONS_TIMEOUT = 10000; // 10 seconds
-      expect(MULTIPLE_FUNCTIONS_TIMEOUT).toBe(10000);
+  describe('Timeout configuration', () => {
+    it('should have correct default timeout value from envConfig', () => {
+      // Test that the timeout is defined correctly in environment configuration
+      const envConfig = getEnvConfig();
+      expect(envConfig.MULTIPLE_FUNCTIONS_TIMEOUT).toBe(10000);
+    });
+
+    it('should allow custom timeout value via envOptions', () => {
+      // Test that custom timeout can be set via envOptions
+      const customEnvConfig = getEnvConfig({ MULTIPLE_FUNCTIONS_TIMEOUT: 20000 });
+      expect(customEnvConfig.MULTIPLE_FUNCTIONS_TIMEOUT).toBe(20000);
     });
   });
 
