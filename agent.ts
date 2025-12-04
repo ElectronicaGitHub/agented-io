@@ -105,6 +105,10 @@ export class Agent implements IAgent {
     return this.mainAgent?.envConfig?.LLM_RETRY_DELAY_MS ?? 1000;
   }
 
+  private get maxNumberOfTriesInFlow(): number {
+    return this.mainAgent?.envConfig?.MAX_NUMBER_OF_TRIES_IN_FLOW ?? 5;
+  }
+
   get messages(): IAgentMessage[] {
     return this.mainAgent?.getMessages(this.parentAgent?.name || 'main', this.name) || [];
   }
@@ -449,6 +453,11 @@ export class Agent implements IAgent {
       this.contextPolyfill(item);
 
       this.flowLength++;
+
+      // Check if we exceeded max number of tries in flow
+      if (this.flowLength > this.maxNumberOfTriesInFlow) {
+        throw new Error(`Max number of tries in flow exceeded (${this.maxNumberOfTriesInFlow}). Agent may be stuck in an infinite loop.`);
+      }
 
       const mixinsResult = await this.processMixins();
 
