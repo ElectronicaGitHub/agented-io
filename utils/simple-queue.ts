@@ -62,7 +62,7 @@ export class SimpleQueue<T> {
       ]);
     } catch (error: any) {
       if (error?.message === 'Processing cancelled') {
-        console.log('Queue: Processing was cancelled for item:', this.currentProcessingItem);
+        // console.log('Queue: Processing was cancelled for item:', this.currentProcessingItem);
       } else {
         console.error('Queue: Error processing item:', error);
       }
