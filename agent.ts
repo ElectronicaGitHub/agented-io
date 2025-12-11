@@ -783,12 +783,31 @@ export class Agent implements IAgent {
   private async handleMultipleFunctionsResponse(multipleFuncRes: IAgentResponseMultipleFunctions): Promise<IAgentFunctionResult> {
     console.log(`[Agent ${this.name}] Starting execution of ${multipleFuncRes.functions.length} functions`);
     
+    const timeout = this.mainAgent?.envConfig?.MULTIPLE_FUNCTIONS_TIMEOUT || 10000;
     const results: string[] = [];
-    const promises = multipleFuncRes.functions.map(async (funcRes) => {
+    const timedOutFunctions: string[] = [];
+    
+    const promisesWithTimeout = multipleFuncRes.functions.map(async (funcRes) => {
       console.log(`[Agent ${this.name}] Starting function: ${funcRes.functionName}`);
       const startTime = Date.now();
+      
+      const timeoutMarker = `__TIMEOUT__${funcRes.functionName}`;
+      
       try {
-        const result = await this.handleFunctionResponse(funcRes);
+        const resultPromise = this.handleFunctionResponse(funcRes);
+        const result = await Promise.race([
+          resultPromise,
+          new Promise<string>((resolve) => 
+            setTimeout(() => resolve(timeoutMarker), timeout)
+          )
+        ]);
+        
+        if (result === timeoutMarker) {
+          console.log(`[Agent ${this.name}] Timeout function: ${funcRes.functionName} after ${timeout}ms`);
+          timedOutFunctions.push(funcRes.functionName);
+          return null;
+        }
+        
         console.log(`[Agent ${this.name}] Completed function: ${funcRes.functionName} in ${Date.now() - startTime}ms`);
         return this.wrapFunctionTextResponse(funcRes, result);
       } catch (error: any) {
@@ -797,24 +816,16 @@ export class Agent implements IAgent {
       }
     });
 
-    try {
-      // Execute all functions with timeout
-      const timeoutPromise = new Promise<string[]>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Functions execution timed out'));
-        }, this.mainAgent?.envConfig?.MULTIPLE_FUNCTIONS_TIMEOUT || 10000);
-      });
-
-      const executionPromise = Promise.all(promises);
-      
-      const functionResults = await Promise.race([executionPromise, timeoutPromise]) as string[];
-      results.push(...functionResults);
-    } catch (error: any) {
-      if (error.message === 'Functions execution timed out') {
-        results.push('Functions failed to execute within the specified time limit');
-      } else {
-        results.push(`Error executing multiple functions: ${error.message}`);
+    const settledResults = await Promise.all(promisesWithTimeout);
+    
+    settledResults.forEach(result => {
+      if (result !== null) {
+        results.push(result);
       }
+    });
+
+    if (timedOutFunctions.length > 0) {
+      results.push(`⚠️ Functions timed out (>${timeout}ms): ${timedOutFunctions.join(', ')}`);
     }
 
     return results.join('\n\n');
