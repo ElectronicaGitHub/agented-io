@@ -701,6 +701,16 @@ export class Agent implements IAgent {
     const hasNonTextActions = functionActions.length > 0 || agentActions.length > 0;
 
     /**
+     * Guard: text-only response with finished: false is invalid.
+     * Force finished: true to prevent agent from getting stuck
+     * (especially critical for sub-agents that block the parent).
+     */
+    if (!hasNonTextActions && !response.finished) {
+      console.warn(`[Agent ${this.name}] Text-only response with finished: false detected — forcing finished: true`);
+      response.finished = true;
+    }
+
+    /**
      * If finished and no non-text actions, stop processing
      */
     if (response.finished && !hasNonTextActions) {

@@ -269,6 +269,31 @@ describe('Agent Unified Actions Response', () => {
     });
   });
 
+  describe('Text-only with finished: false guard', () => {
+    it('should force finished: true and emit MAIN_RESPONSE when only text action with finished: false', async () => {
+      const badResponse: IAgentResponse = {
+        actions: [{ type: EAgentResponseType.TEXT, text: 'Some text without finish' }],
+        finished: false,
+      };
+
+      const { agent } = await createTestAgent({ llmResponses: [badResponse] });
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const promise = waitForEvent(agent, EAgentEvent.MAIN_RESPONSE);
+      agent.process('test', 'user');
+      const msg = await promise;
+
+      expect(msg.text).toBe('Some text without finish');
+      expect(agent.currentStatus).toBe(EAgentStatus.IDLE);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Text-only response with finished: false detected')
+      );
+
+      warnSpy.mockRestore();
+    });
+  });
+
   describe('Enum values', () => {
     it('should have correct enum values', () => {
       expect(EAgentResponseType.FUNCTION).toBe('function');

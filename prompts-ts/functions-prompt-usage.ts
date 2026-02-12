@@ -22,6 +22,7 @@ Multiple parallel functions: \`{"actions": [{"type": "function", "functionName":
 **Rules:**
 - \`finished: true\` — task complete, no more work needed
 - \`finished: false\` — more work needed (functions/agents to execute)
+- **IMPORTANT:** If your response contains ONLY text action(s) and NO function/agent actions, you MUST set \`finished: true\`. A text-only response with \`finished: false\` is invalid — if you have nothing more to execute, you are finished.
 - You can combine text with functions/agents in a single response
 - Functions in actions array execute in parallel
 
