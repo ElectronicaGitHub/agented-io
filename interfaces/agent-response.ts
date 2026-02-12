@@ -1,32 +1,30 @@
 import { EAgentResponseType } from '../enums';
 
-export type IAgentResponse = (IAgentResponseFunction | IAgentResponseText | IAgentResponseAgent | IAgentResponseMultipleFunctions) & {
-  explanation?: string;
-};
+// --- Unified Actions-based Response Format ---
 
-export interface IAgentResponseAgent {
-  type: EAgentResponseType.AGENT;
-  name: string;
-  prompt: string;
-  specialInstructions: string;
-  finished: boolean;
+export interface IAgentActionText {
+  type: EAgentResponseType.TEXT;
+  text: string;
 }
 
-export interface IAgentResponseFunction {
+export interface IAgentActionFunction {
   type: EAgentResponseType.FUNCTION;
   functionName: string;
   paramsToPass: Record<string, any>;
-  finished: boolean;
 }
 
-export interface IAgentResponseText {
-  type: EAgentResponseType.TEXT;
-  text: string;
-  finished: boolean;
+export interface IAgentActionAgent {
+  type: EAgentResponseType.AGENT;
+  name: string;
+  specialInstructions: string;
 }
 
-export interface IAgentResponseMultipleFunctions {
-  type: EAgentResponseType.MULTIPLE_FUNCTIONS;
-  functions: IAgentResponseFunction[];
+export type IAgentAction = IAgentActionText | IAgentActionFunction | IAgentActionAgent;
+
+export interface IAgentResponseUnified {
+  actions: IAgentAction[];
   finished: boolean;
+  explanation?: string;
 }
+
+export type IAgentResponse = IAgentResponseUnified;

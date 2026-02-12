@@ -10,5 +10,4 @@ export enum EAgentResponseType {
   TEXT = 'text',
   AGENT = 'agent',
   COMMAND = 'command',
-  MULTIPLE_FUNCTIONS = 'multiple_functions',
 }

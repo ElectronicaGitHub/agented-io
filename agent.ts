@@ -36,13 +36,13 @@ import {
   IUpdatedContext,
   IAgentResponse,
   IAgentFunctionResult,
-  IAgentResponseFunction,
-  IAgentResponseAgent,
   IFunctionExecutionCommandResult,
-  IAgentResponseText,
-  IAgentResponseMultipleFunctions,
   ISplitPrompt,
   ILLMUsageMetadata,
+  IAgentAction,
+  IAgentActionFunction,
+  IAgentActionAgent,
+  IAgentActionText,
 } from './interfaces';
 import { IFunctionsStoreService } from './interfaces/functions-store-service.interface';
 import { createAgentFactory } from './utils/agent-factory';
@@ -492,32 +492,19 @@ export class Agent implements IAgent {
             if (retryCount === this.maxRetries) {
               throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response was not an object.`);
             }
-            // Add delay before retry
             if (retryCount < this.maxRetries) {
               await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
             }
             continue;
           }
 
-          // Handle array of functions response
-          if (Array.isArray(result)) {
-            console.log(`[Agent ${this.name}] Received array of functions:`, result);
-            response = {
-              type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-              functions: result,
-              finished: false,
-            };
-            break;
-          }
-
-          // Validate response has required type field
-          if (!result.type) {
-            console.log(`[Agent ${this.name}] Response missing type field (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
+          // Validate unified response has actions array
+          if (!result.actions || !Array.isArray(result.actions)) {
+            console.log(`[Agent ${this.name}] Response missing actions array (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
             retryCount++;
             if (retryCount === this.maxRetries) {
-              throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response missing type field.`);
+              throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response missing actions array.`);
             }
-            // Add delay before retry
             if (retryCount < this.maxRetries) {
               await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
             }
@@ -537,7 +524,6 @@ export class Agent implements IAgent {
           if (retryCount === this.maxRetries) {
             throw error;
           }
-          // Add delay before retry
           if (retryCount < this.maxRetries) {
             await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
           }
@@ -548,9 +534,8 @@ export class Agent implements IAgent {
         throw new Error('Failed to get valid LLM response after all retries');
       }
       
-      const { stopProcessing, result, agent } = await this.handleResponse(response);
-      const event = this.buildResponseEvent(response, result, metadata);
-
+      const { stopProcessing, functionResults, textContent, agentActions } = await this.handleResponse(response);
+      const event = this.buildResponseEvent(response, functionResults, metadata, textContent);
 
       if (stopProcessing) {
         /**
@@ -564,15 +549,21 @@ export class Agent implements IAgent {
 
         this.addMessages([event]);
       } else {
-        this.emit(EAgentEvent.RESPONSE, event);
-        // console.log(`[Agent ${this.name}] event.type: ${event.type}`);
         /**
-         * Functional response should not be added to the messages
-         * because it's already added to the messages and here - it's the same
+         * Emit text to user immediately if present
          */
-        const eventTypesWithoutMessages = [EAgentResponseType.FUNCTION, EAgentResponseType.AGENT, EAgentResponseType.MULTIPLE_FUNCTIONS];
-        if (event.type && !eventTypesWithoutMessages.includes(event.type)) {
-          this.addMessages([event]);
+        if (textContent) {
+          const textEvent: IAgentMessage = {
+            createdAt: new Date(),
+            sender: this.name,
+            senderType: this.agentSchema.type,
+            text: textContent,
+            type: EAgentResponseType.TEXT,
+            explanation: response.explanation || '',
+            metadata,
+          };
+          this.emit(EAgentEvent.RESPONSE, textEvent);
+          this.addMessages([textEvent]);
         }
 
         if (event.commands?.length) {
@@ -587,31 +578,34 @@ export class Agent implements IAgent {
         }
 
         /**
-         * If it's a function response - then just process it via the same agent
+         * If there were function results, feed them back into the agent
          */
-        if (event.type === EAgentResponseType.FUNCTION) {
-          // here we pass type explicitly, to define correct messages
-          this.process(event.text, this.name, EAgentResponseType.FUNCTION, event.functionName);
+        if (functionResults) {
+          const functionNames = response.actions
+            .filter((a): a is IAgentActionFunction => a.type === EAgentResponseType.FUNCTION)
+            .map(a => a.functionName)
+            .join(', ');
+          this.process(functionResults, this.name, EAgentResponseType.FUNCTION, functionNames);
         }
+
         /**
-         * If it's a multiple functions response - then just process it via the same agent
+         * Launch agent actions
          */
-        if (event.type === EAgentResponseType.MULTIPLE_FUNCTIONS) {
-          // here we pass type explicitly, to define correct messages
-          this.process(event.text, this.name, EAgentResponseType.MULTIPLE_FUNCTIONS, event.functionName);
-        }
-        /**
-         * If it's an agent response - then process it via the same agent
-         */
-        if (event.type === EAgentResponseType.AGENT) {
-          const agentRes = this.returnAsAgentResponse(response);
-          if (agent) {
-            console.log(`[Agent ${this.name}] Setting initial messages and ctx to agent ${agentRes.name}`);
-            agent.setInitialMessages(this.messages);
-            agent.setCtx(this.ctx);
-            agent.process(agentRes.specialInstructions, this.name);
-          } else {
-            console.error(`[Agent ${this.name}] Agent ${agentRes.name} not found`);
+        if (agentActions.length > 0) {
+          for (const agentAction of agentActions) {
+            const childAgent = this.children.find(child => child.name === agentAction.name);
+            if (childAgent) {
+              if (childAgent.currentStatus === EAgentStatus.WORKING) {
+                console.log(`[Agent ${this.name}] Agent ${agentAction.name} is already working, skipping`);
+                continue;
+              }
+              console.log(`[Agent ${this.name}] Setting initial messages and ctx to agent ${agentAction.name}`);
+              childAgent.setInitialMessages(this.messages);
+              childAgent.setCtx(this.ctx);
+              childAgent.process(agentAction.specialInstructions, this.name);
+            } else {
+              console.error(`[Agent ${this.name}] Agent ${agentAction.name} not found`);
+            }
           }
         }
       }
@@ -666,30 +660,27 @@ export class Agent implements IAgent {
     };
   }
 
-  private buildResponseEvent(response: IAgentResponse, result?: IAgentFunctionResult, metadata?: ILLMUsageMetadata): IAgentMessage {
-    const isCommandResult = Array.isArray(result);
-    const text = isCommandResult ? result[0] : (result || '') as string;
-    const commands = isCommandResult ? result[1] : [];
+  private buildResponseEvent(response: IAgentResponse, functionResults?: string, metadata?: ILLMUsageMetadata, textContent?: string): IAgentMessage {
+    const functionActions = response.actions.filter((a): a is IAgentActionFunction => a.type === EAgentResponseType.FUNCTION);
+    const agentActions = response.actions.filter((a): a is IAgentActionAgent => a.type === EAgentResponseType.AGENT);
     
-    let functionName = '';
-    if (response.type === EAgentResponseType.FUNCTION) {
-      functionName = (response as IAgentResponseFunction).functionName || '';
-    } else if (response.type === EAgentResponseType.MULTIPLE_FUNCTIONS) {
-      const multipleFuncRes = response as IAgentResponseMultipleFunctions;
-      functionName = multipleFuncRes.functions.map(f => f.functionName).join(', ');
-    }
+    const functionName = functionActions.map(a => a.functionName).join(', ');
+    const agentName = agentActions.map(a => a.name).join(', ');
+    const agentSpecialInstructions = agentActions.map(a => a.specialInstructions).join('; ');
+    
+    const text = textContent || functionResults || '';
     
     const event: IAgentMessage = {
       createdAt: new Date(),
-      type: response.type,
+      type: functionActions.length > 0 ? EAgentResponseType.FUNCTION : 
+            agentActions.length > 0 ? EAgentResponseType.AGENT : EAgentResponseType.TEXT,
       sender: this.name,
       senderType: this.agentSchema.type,
       text,
-      commands,
       explanation: response.explanation || '',
       functionName,
-      name: (response as IAgentResponseAgent).name || '',
-      specialInstructions: (response as IAgentResponseAgent).specialInstructions || '',
+      name: agentName,
+      specialInstructions: agentSpecialInstructions,
       metadata,
     };
     return event;
@@ -697,104 +688,57 @@ export class Agent implements IAgent {
 
   private async handleResponse(response: IAgentResponse): Promise<{ 
     stopProcessing: boolean, 
-    result?: IAgentFunctionResult,
-    type?: EAgentResponseType,
-    agent?: IAgent,
+    functionResults?: string,
+    textContent?: string,
+    agentActions: IAgentActionAgent[],
   }> {
-    let result: IAgentFunctionResult = '';
-    /**
-     * Function response
-     */
-    if (typeof response === 'string') {
-      return { stopProcessing: true, result: response, type: EAgentResponseType.TEXT };
-    }
+    const textActions = response.actions.filter((a): a is IAgentActionText => a.type === EAgentResponseType.TEXT);
+    const functionActions = response.actions.filter((a): a is IAgentActionFunction => a.type === EAgentResponseType.FUNCTION);
+    const agentActions = response.actions.filter((a): a is IAgentActionAgent => a.type === EAgentResponseType.AGENT);
 
-    const funcRes = this.returnAsFunctionalResponse(response);
-    if (funcRes.type === EAgentResponseType.FUNCTION) {
-      console.log(`[Agent ${this.name}] Executing function: ${funcRes.functionName}`);
-      result = await this.handleFunctionResponse(funcRes);
-      
-      return { stopProcessing: false, result, type: funcRes.type };
-    }
-
-    /**
-     * Multiple functions response
-     */
-    const multipleFuncRes = this.returnAsMultipleFunctionsResponse(response);
-    if (multipleFuncRes.type === EAgentResponseType.MULTIPLE_FUNCTIONS) {
-      console.log(`[Agent ${this.name}] Executing multiple functions: ${multipleFuncRes.functions.map(f => f.functionName).join(', ')}`);
-      result = await this.handleMultipleFunctionsResponse(multipleFuncRes);
-      return { stopProcessing: false, result, type: multipleFuncRes.type };
-    }
-
-    /**
-     * Agent response
-     */
-    const agentRes = this.returnAsAgentResponse(response);
-    if (agentRes.type === EAgentResponseType.AGENT) {
-      const agent = this.children.find(child => child.name === agentRes.name);
-
-      // Check if agent is already working
-      if (agent && agent.currentStatus === EAgentStatus.WORKING) {
-        return { stopProcessing: true, result: `Waiting for response from ${agentRes.name}`, type: agentRes.type };
-      }
-
-      return { stopProcessing: false, result: agentRes.name, type: agentRes.type, agent: agent };
-    }
+    const textContent = textActions.map(a => a.text).join('\n') || '';
     
+    const hasNonTextActions = functionActions.length > 0 || agentActions.length > 0;
+
     /**
-     * Text response
+     * If finished and no non-text actions, stop processing
      */
-    const textRes = this.returnAsTextResponse(response);
-    if (textRes.type === EAgentResponseType.TEXT) {
+    if (response.finished && !hasNonTextActions) {
       this.flowLength = 0;
-      return { stopProcessing: true, result: textRes.text, type: textRes.type };
+      return { stopProcessing: true, textContent, agentActions: [] };
     }
 
     /**
-     * If not finished, continue processing
+     * Execute function actions in parallel
      */
-    return { stopProcessing: false, result: textRes.text, type: textRes.type };
-  }
-
-  private async handleFunctionResponse(funcRes: IAgentResponseFunction): Promise<IAgentFunctionResult> {
-    const mpFunction = this.marketplaceFunctions?.find(el => el.name === funcRes.functionName);
-
-    let result: IAgentFunctionResult;
-    
-    result = await this.executeFunction(funcRes);
-
-    /**
-     * Handling the result from function, is it a string or an a CommandResult
-     */
-    const resultIsCommand = Array.isArray(result);
-    
-    if (resultIsCommand) {
-      const resultWithCommands = this.returnAsCommandResult(result);
-      const stringResponse = this.wrapFunctionTextResponse(funcRes, resultWithCommands);
-      const commandResult = resultWithCommands[1];
-
-      return [stringResponse, commandResult];
-    } else {
-      return this.wrapFunctionTextResponse(funcRes, result);
+    let functionResults: string | undefined;
+    if (functionActions.length > 0) {
+      functionResults = await this.handleFunctionActions(functionActions);
     }
+
+    return { 
+      stopProcessing: false, 
+      functionResults, 
+      textContent: textContent || undefined, 
+      agentActions,
+    };
   }
 
-  private async handleMultipleFunctionsResponse(multipleFuncRes: IAgentResponseMultipleFunctions): Promise<IAgentFunctionResult> {
-    console.log(`[Agent ${this.name}] Starting execution of ${multipleFuncRes.functions.length} functions`);
+  private async handleFunctionActions(functionActions: IAgentActionFunction[]): Promise<string> {
+    console.log(`[Agent ${this.name}] Executing ${functionActions.length} function(s): ${functionActions.map(f => f.functionName).join(', ')}`);
     
     const timeout = this.mainAgent?.envConfig?.MULTIPLE_FUNCTIONS_TIMEOUT || 10000;
     const results: string[] = [];
     const timedOutFunctions: string[] = [];
     
-    const promisesWithTimeout = multipleFuncRes.functions.map(async (funcRes) => {
-      console.log(`[Agent ${this.name}] Starting function: ${funcRes.functionName}`);
+    const promisesWithTimeout = functionActions.map(async (funcAction) => {
+      console.log(`[Agent ${this.name}] Starting function: ${funcAction.functionName}`);
       const startTime = Date.now();
       
-      const timeoutMarker = `__TIMEOUT__${funcRes.functionName}`;
+      const timeoutMarker = `__TIMEOUT__${funcAction.functionName}`;
       
       try {
-        const resultPromise = this.handleFunctionResponse(funcRes);
+        const resultPromise = this.executeSingleFunction(funcAction);
         const result = await Promise.race([
           resultPromise,
           new Promise<string>((resolve) => 
@@ -803,16 +747,16 @@ export class Agent implements IAgent {
         ]);
         
         if (result === timeoutMarker) {
-          console.log(`[Agent ${this.name}] Timeout function: ${funcRes.functionName} after ${timeout}ms`);
-          timedOutFunctions.push(funcRes.functionName);
+          console.log(`[Agent ${this.name}] Timeout function: ${funcAction.functionName} after ${timeout}ms`);
+          timedOutFunctions.push(funcAction.functionName);
           return null;
         }
         
-        console.log(`[Agent ${this.name}] Completed function: ${funcRes.functionName} in ${Date.now() - startTime}ms`);
-        return this.wrapFunctionTextResponse(funcRes, result);
+        console.log(`[Agent ${this.name}] Completed function: ${funcAction.functionName} in ${Date.now() - startTime}ms`);
+        return this.wrapFunctionTextResponse(funcAction, result as IAgentFunctionResult);
       } catch (error: any) {
-        console.log(`[Agent ${this.name}] Failed function: ${funcRes.functionName} after ${Date.now() - startTime}ms - Error: ${error.message}`);
-        return `Error executing function ${funcRes.functionName}: ${error.message}`;
+        console.log(`[Agent ${this.name}] Failed function: ${funcAction.functionName} after ${Date.now() - startTime}ms - Error: ${error.message}`);
+        return `Error executing function ${funcAction.functionName}: ${error.message}`;
       }
     });
 
@@ -831,26 +775,45 @@ export class Agent implements IAgent {
     return results.join('\n\n');
   }
 
+  private async executeSingleFunction(funcAction: IAgentActionFunction): Promise<IAgentFunctionResult> {
+    const result = await this.executeFunction(funcAction);
+
+    /**
+     * Handling the result from function, is it a string or an a CommandResult
+     */
+    const resultIsCommand = Array.isArray(result);
+    
+    if (resultIsCommand) {
+      const resultWithCommands = this.returnAsCommandResult(result);
+      const stringResponse = this.wrapFunctionTextResponse(funcAction, resultWithCommands);
+      const commandResult = resultWithCommands[1];
+
+      return [stringResponse, commandResult];
+    } else {
+      return this.wrapFunctionTextResponse(funcAction, result);
+    }
+  }
+
   private wrapFunctionTextResponse(
-    funcRes: IAgentResponseFunction, 
+    funcAction: IAgentActionFunction, 
     result: IAgentFunctionResult,
   ): string {
     const text = 'Fn Call Result: ';
     const resultIsText = typeof result === 'string';
     return [
-      this.wrapFunctionCall(funcRes),
+      this.wrapFunctionCall(funcAction),
       `${text}${resultIsText ? result : JSON.stringify(result, null, 2)}`,
     ].filter(Boolean).join('\n');
   }
   
-  private async executeFunction(funcRes: IAgentResponseFunction): Promise<IAgentFunctionResult> {
+  private async executeFunction(funcAction: IAgentActionFunction): Promise<IAgentFunctionResult> {
     const functions = this.retrieveFunctionsFromAgent(this.agentSchema);
 
     try {
       if (functions) {
-        const func = functions.find(func => func.name === funcRes.functionName)?.func;
+        const func = functions.find(func => func.name === funcAction.functionName)?.func;
         if (!func) {
-          throw new Error(`Function ${funcRes.functionName} not found`);
+          throw new Error(`Function ${funcAction.functionName} not found`);
         }
         
         let result: IAgentFunctionResult = '';
@@ -858,7 +821,7 @@ export class Agent implements IAgent {
           ...this.ctx,
         }
         
-        const args = funcRes.paramsToPass;
+        const args = funcAction.paramsToPass;
         const hasArgs = Object.keys(args).length;
         
         if (hasArgs) {
@@ -877,9 +840,9 @@ export class Agent implements IAgent {
     }
   }
 
-  private wrapFunctionCall(funcRes: IAgentResponseFunction): string {
-    const hasParams = funcRes.paramsToPass && Object.keys(funcRes.paramsToPass).length > 0;
-    return `Fn Call ${funcRes.functionName}()${hasParams ? ` with params: ${JSON.stringify(funcRes.paramsToPass, null, 2)}` : ''}`;
+  private wrapFunctionCall(funcAction: IAgentActionFunction): string {
+    const hasParams = funcAction.paramsToPass && Object.keys(funcAction.paramsToPass).length > 0;
+    return `Fn Call ${funcAction.functionName}()${hasParams ? ` with params: ${JSON.stringify(funcAction.paramsToPass, null, 2)}` : ''}`;
   }
 
   private async initSubagents(children: IAgentSchema[]): Promise<void> {
@@ -897,22 +860,8 @@ export class Agent implements IAgent {
     return '';
   }
 
-  private returnAsFunctionalResponse(resp: IAgentResponse): IAgentResponseFunction {
-    return resp as IAgentResponseFunction;
-  }
-  private returnAsTextResponse(resp: IAgentResponse): IAgentResponseText {
-    return resp as IAgentResponseText;
-  }
-  private returnAsAgentResponse(resp: IAgentResponse): IAgentResponseAgent {
-    return resp as IAgentResponseAgent;
-  }
-
   private returnAsCommandResult(resp: IAgentFunctionResult): IFunctionExecutionCommandResult {
     return resp as IFunctionExecutionCommandResult;
-  }
-
-  private returnAsMultipleFunctionsResponse(resp: IAgentResponse): IAgentResponseMultipleFunctions {
-    return resp as IAgentResponseMultipleFunctions;
   }
 
   private handleChildrenPendingResponses(result: IAgentMessage, sender: string): boolean {  

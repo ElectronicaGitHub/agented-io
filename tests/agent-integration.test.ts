@@ -1,14 +1,14 @@
 
 import { Agent } from '../agent';
 import { EAgentType, EAgentResponseType } from '../enums';
-import { IAgentSchema } from '../interfaces';
+import { IAgentSchema, IAgentResponse, IAgentActionFunction } from '../interfaces';
 
 // Mock all external dependencies
 jest.mock('../processors/llm-processor');
 jest.mock('../main-agent');
 jest.mock('../utils/agent-factory');
 
-describe('Agent Integration - Multiple Functions', () => {
+describe('Agent Integration - Unified Actions', () => {
   let agent: Agent;
   let mockAgentSchema: IAgentSchema;
 
@@ -37,161 +37,166 @@ describe('Agent Integration - Multiple Functions', () => {
     jest.clearAllTimers();
   });
 
-  describe('Multiple functions execution', () => {
-    it('should handle multiple functions response correctly', async () => {
-      const multipleFunctionsResponse = {
-        type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-        functions: [
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'function1',
-            paramsToPass: { param1: 'value1' },
-            finished: false,
-          },
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'function2',
-            paramsToPass: { param2: 'value2' },
-            finished: false,
-          },
-        ],
-        finished: false,
-      };
+  describe('Multiple functions execution via handleFunctionActions', () => {
+    it('should handle multiple function actions correctly', async () => {
+      const functionActions: IAgentActionFunction[] = [
+        {
+          type: EAgentResponseType.FUNCTION,
+          functionName: 'function1',
+          paramsToPass: { param1: 'value1' },
+        },
+        {
+          type: EAgentResponseType.FUNCTION,
+          functionName: 'function2',
+          paramsToPass: { param2: 'value2' },
+        },
+      ];
 
-      // Mock the handleFunctionResponse method
-      const mockHandleFunctionResponse = jest.spyOn(agent as any, 'handleFunctionResponse');
-      mockHandleFunctionResponse.mockResolvedValue('function result');
+      // Mock the executeSingleFunction method
+      const mockExecuteSingleFunction = jest.spyOn(agent as any, 'executeSingleFunction');
+      mockExecuteSingleFunction.mockResolvedValue('function result');
 
-      const result = await (agent as any).handleMultipleFunctionsResponse(multipleFunctionsResponse);
+      const result = await (agent as any).handleFunctionActions(functionActions);
 
-      expect(mockHandleFunctionResponse).toHaveBeenCalledTimes(2);
+      expect(mockExecuteSingleFunction).toHaveBeenCalledTimes(2);
       expect(result).toContain('function result');
     });
 
-    it('should handle timeout in multiple functions execution', async () => {
-      const multipleFunctionsResponse = {
-        type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-        functions: [
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'slow_function',
-            paramsToPass: {},
-            finished: false,
-          },
-        ],
-        finished: false,
-      };
+    it('should handle timeout in function actions execution', async () => {
+      const functionActions: IAgentActionFunction[] = [
+        {
+          type: EAgentResponseType.FUNCTION,
+          functionName: 'slow_function',
+          paramsToPass: {},
+        },
+      ];
 
-      // Mock the handleFunctionResponse method to be slow
-      const mockHandleFunctionResponse = jest.spyOn(agent as any, 'handleFunctionResponse');
-      mockHandleFunctionResponse.mockImplementation(() => 
+      // Mock the executeSingleFunction method to be slow
+      const mockExecuteSingleFunction = jest.spyOn(agent as any, 'executeSingleFunction');
+      mockExecuteSingleFunction.mockImplementation(() => 
         new Promise(resolve => setTimeout(() => resolve('slow result'), 15000))
       );
 
-      const result = await (agent as any).handleMultipleFunctionsResponse(multipleFunctionsResponse);
+      const result = await (agent as any).handleFunctionActions(functionActions);
 
-      expect(result).toContain('Functions failed to execute within the specified time limit');
-    }, 15000); // Increase timeout for this test
+      expect(result).toContain('Functions timed out');
+    }, 15000);
 
-    it('should handle errors in multiple functions execution', async () => {
-      const multipleFunctionsResponse = {
-        type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-        functions: [
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'error_function',
-            paramsToPass: {},
-            finished: false,
-          },
-        ],
-        finished: false,
-      };
+    it('should handle errors in function actions execution', async () => {
+      const functionActions: IAgentActionFunction[] = [
+        {
+          type: EAgentResponseType.FUNCTION,
+          functionName: 'error_function',
+          paramsToPass: {},
+        },
+      ];
 
-      // Mock the handleFunctionResponse method to throw error
-      const mockHandleFunctionResponse = jest.spyOn(agent as any, 'handleFunctionResponse');
-      mockHandleFunctionResponse.mockRejectedValue(new Error('Function error'));
+      // Mock the executeSingleFunction method to throw error
+      const mockExecuteSingleFunction = jest.spyOn(agent as any, 'executeSingleFunction');
+      mockExecuteSingleFunction.mockRejectedValue(new Error('Function error'));
 
-      const result = await (agent as any).handleMultipleFunctionsResponse(multipleFunctionsResponse);
+      const result = await (agent as any).handleFunctionActions(functionActions);
 
       expect(result).toContain('Error executing function error_function: Function error');
     });
   });
 
   describe('Response building', () => {
-    it('should build response event for multiple functions correctly', () => {
-      const response = {
-        type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-        functions: [
+    it('should build response event for multiple function actions correctly', () => {
+      const response: IAgentResponse = {
+        actions: [
           {
             type: EAgentResponseType.FUNCTION,
             functionName: 'function1',
             paramsToPass: {},
-            finished: false,
           },
           {
             type: EAgentResponseType.FUNCTION,
             functionName: 'function2',
             paramsToPass: {},
-            finished: false,
           },
         ],
         finished: false,
       };
 
-      const result = 'multiple functions result';
-      const event = (agent as any).buildResponseEvent(response, result);
+      const functionResults = 'multiple functions result';
+      const event = (agent as any).buildResponseEvent(response, functionResults);
 
-      expect(event.type).toBe(EAgentResponseType.MULTIPLE_FUNCTIONS);
+      expect(event.type).toBe(EAgentResponseType.FUNCTION);
       expect(event.functionName).toBe('function1, function2');
       expect(event.text).toBe('multiple functions result');
       expect(event.sender).toBe('test-agent');
     });
+
+    it('should build response event for text actions correctly', () => {
+      const response: IAgentResponse = {
+        actions: [
+          { type: EAgentResponseType.TEXT, text: 'Hello' },
+        ],
+        finished: true,
+      };
+
+      const event = (agent as any).buildResponseEvent(response, undefined, undefined, 'Hello');
+
+      expect(event.type).toBe(EAgentResponseType.TEXT);
+      expect(event.text).toBe('Hello');
+      expect(event.sender).toBe('test-agent');
+    });
   });
 
-  describe('Array response detection', () => {
-    it('should detect array response and convert to multiple functions', () => {
-      const arrayResponse = [
-        {
-          type: EAgentResponseType.FUNCTION,
-          functionName: 'function1',
-          paramsToPass: { param1: 'value1' },
-          finished: false,
-        },
-        {
-          type: EAgentResponseType.FUNCTION,
-          functionName: 'function2',
-          paramsToPass: { param2: 'value2' },
-          finished: false,
-        },
-      ];
-
-      // Test the conversion logic
-      const convertedResponse = {
-        type: EAgentResponseType.MULTIPLE_FUNCTIONS,
-        functions: arrayResponse,
+  describe('Unified actions response format', () => {
+    it('should accept unified response with multiple function actions', () => {
+      const response: IAgentResponse = {
+        actions: [
+          {
+            type: EAgentResponseType.FUNCTION,
+            functionName: 'function1',
+            paramsToPass: { param1: 'value1' },
+          },
+          {
+            type: EAgentResponseType.FUNCTION,
+            functionName: 'function2',
+            paramsToPass: { param2: 'value2' },
+          },
+        ],
         finished: false,
       };
 
-      expect(convertedResponse.type).toBe(EAgentResponseType.MULTIPLE_FUNCTIONS);
-      expect(convertedResponse.functions).toEqual(arrayResponse);
-      expect(convertedResponse.functions.length).toBe(2);
+      expect(response.actions).toHaveLength(2);
+      expect(response.actions[0].type).toBe(EAgentResponseType.FUNCTION);
+      expect(response.actions[1].type).toBe(EAgentResponseType.FUNCTION);
+      expect(response.finished).toBe(false);
+    });
+
+    it('should accept mixed text and function actions', () => {
+      const response: IAgentResponse = {
+        actions: [
+          { type: EAgentResponseType.TEXT, text: 'Working...' },
+          { type: EAgentResponseType.FUNCTION, functionName: 'fn1', paramsToPass: {} },
+        ],
+        finished: false,
+        explanation: 'Processing request',
+      };
+
+      expect(response.actions).toHaveLength(2);
+      expect(response.actions[0].type).toBe(EAgentResponseType.TEXT);
+      expect(response.actions[1].type).toBe(EAgentResponseType.FUNCTION);
     });
   });
 
   describe('Real LLM integration with multiple functions', () => {
-    it('should handle real LLM response with multiple functions', async () => {
-      // Create agent schema with test functions
+    it('should handle LLM response with multiple function actions', async () => {
       const testAgentSchema: IAgentSchema = {
         id: 'test-llm-schema-id',
         name: 'test-llm-agent',
         type: EAgentType.PERMANENT,
-        prompt: 'You are a test agent. When asked to get data from multiple sources, respond with an array of function calls.',
+        prompt: 'You are a test agent.',
         functions: [
           {
             name: 'get_weather_data',
             description: 'Get weather data for a location',
             func: async (params: any) => {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+              await new Promise(resolve => setTimeout(resolve, 1000));
               return `Weather data for ${params.location}: sunny, 25°C`;
             },
             paramsToPass: { location: 'string' }
@@ -200,7 +205,7 @@ describe('Agent Integration - Multiple Functions', () => {
             name: 'get_stock_price',
             description: 'Get stock price for a symbol',
             func: async (params: any) => {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+              await new Promise(resolve => setTimeout(resolve, 1000));
               return `Stock price for ${params.symbol}: $150.25`;
             },
             paramsToPass: { symbol: 'string' }
@@ -209,7 +214,7 @@ describe('Agent Integration - Multiple Functions', () => {
             name: 'get_news_headlines',
             description: 'Get latest news headlines',
             func: async (params: any) => {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+              await new Promise(resolve => setTimeout(resolve, 1000));
               return `Latest news: ${params.topic} - Breaking developments`;
             },
             paramsToPass: { topic: 'string' }
@@ -218,60 +223,50 @@ describe('Agent Integration - Multiple Functions', () => {
         children: [],
       };
 
-      // Create new agent with test functions
       const testAgent = new Agent('test-llm-id', testAgentSchema);
-
-      // Initialize the agent
       await testAgent.init();
 
-      // Mock LLM to return array of functions
+      // Mock LLM to return unified actions response
       const mockLLMProcessor = testAgent['llmProcessor'];
       mockLLMProcessor.getLLMResultSendMessage = jest.fn().mockResolvedValue({
-        result: [
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'get_weather_data',
-            paramsToPass: { location: 'New York' },
-            finished: false,
-          },
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'get_stock_price',
-            paramsToPass: { symbol: 'AAPL' },
-            finished: false,
-          },
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'get_news_headlines',
-            paramsToPass: { topic: 'technology' },
-            finished: false,
-          }
-        ],
-        metadata: {}
+        result: {
+          actions: [
+            {
+              type: EAgentResponseType.FUNCTION,
+              functionName: 'get_weather_data',
+              paramsToPass: { location: 'New York' },
+            },
+            {
+              type: EAgentResponseType.FUNCTION,
+              functionName: 'get_stock_price',
+              paramsToPass: { symbol: 'AAPL' },
+            },
+            {
+              type: EAgentResponseType.FUNCTION,
+              functionName: 'get_news_headlines',
+              paramsToPass: { topic: 'technology' },
+            }
+          ],
+          finished: false,
+        },
+        metadata: { inputTokens: 10, outputTokens: 5, cachedTokens: 0, nonCachedTokens: 10, modelUsed: 'test' }
       });
 
-      // Process the request
       const startTime = Date.now();
       testAgent.process('Get me weather data for New York, stock price for AAPL, and latest tech news', 'user');
       
-      // Wait for processing to complete (functions take 1 second each, but run in parallel)
       await new Promise(resolve => setTimeout(resolve, 3000));
       
       const endTime = Date.now();
       const executionTime = endTime - startTime;
 
-      // Verify that all functions were called
       expect(mockLLMProcessor.getLLMResultSendMessage).toHaveBeenCalled();
+      expect(executionTime).toBeLessThan(4000);
       
-      // Check that execution time is reasonable (should be around 1 second due to parallel execution)
-      expect(executionTime).toBeLessThan(4000); // Should be much less than 4 seconds if parallel
-      
-      // Cleanup
       (testAgent as any).cleanup?.();
-    }, 10000); // 10 second timeout
+    }, 10000);
 
     it('should execute multiple functions in parallel and measure performance', async () => {
-      // Create agent with functions that have different execution times
       const testAgentSchema: IAgentSchema = {
         id: 'test-parallel-schema-id',
         name: 'test-parallel-agent',
@@ -282,7 +277,7 @@ describe('Agent Integration - Multiple Functions', () => {
             name: 'fast_function',
             description: 'Fast function that returns quickly',
             func: async () => {
-              await new Promise(resolve => setTimeout(resolve, 100)); // 100ms
+              await new Promise(resolve => setTimeout(resolve, 100));
               return 'Fast function completed';
             },
             paramsToPass: {}
@@ -291,7 +286,7 @@ describe('Agent Integration - Multiple Functions', () => {
             name: 'medium_function',
             description: 'Medium function that takes some time',
             func: async () => {
-              await new Promise(resolve => setTimeout(resolve, 500)); // 500ms
+              await new Promise(resolve => setTimeout(resolve, 500));
               return 'Medium function completed';
             },
             paramsToPass: {}
@@ -300,7 +295,7 @@ describe('Agent Integration - Multiple Functions', () => {
             name: 'slow_function',
             description: 'Slow function that takes longer',
             func: async () => {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // 1000ms
+              await new Promise(resolve => setTimeout(resolve, 1000));
               return 'Slow function completed';
             },
             paramsToPass: {}
@@ -310,41 +305,25 @@ describe('Agent Integration - Multiple Functions', () => {
       };
 
       const testAgent = new Agent('test-parallel-id', testAgentSchema);
-
-      // Initialize the agent
       await testAgent.init();
 
-      // Mock LLM to return array of all three functions
+      // Mock LLM to return unified actions response with all three functions
       const mockLLMProcessor = testAgent['llmProcessor'];
       mockLLMProcessor.getLLMResultSendMessage = jest.fn().mockResolvedValue({
-        result: [
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'fast_function',
-            paramsToPass: {},
-            finished: false,
-          },
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'medium_function',
-            paramsToPass: {},
-            finished: false,
-          },
-          {
-            type: EAgentResponseType.FUNCTION,
-            functionName: 'slow_function',
-            paramsToPass: {},
-            finished: false,
-          }
-        ],
-        metadata: {}
+        result: {
+          actions: [
+            { type: EAgentResponseType.FUNCTION, functionName: 'fast_function', paramsToPass: {} },
+            { type: EAgentResponseType.FUNCTION, functionName: 'medium_function', paramsToPass: {} },
+            { type: EAgentResponseType.FUNCTION, functionName: 'slow_function', paramsToPass: {} },
+          ],
+          finished: false,
+        },
+        metadata: { inputTokens: 10, outputTokens: 5, cachedTokens: 0, nonCachedTokens: 10, modelUsed: 'test' }
       });
 
-      // Process request and measure time
       const startTime = Date.now();
       testAgent.process('Execute all functions', 'user');
       
-      // Wait for all functions to complete (should be ~1000ms if parallel)
       await new Promise(resolve => setTimeout(resolve, 2500));
       
       const endTime = Date.now();
@@ -352,11 +331,9 @@ describe('Agent Integration - Multiple Functions', () => {
 
       console.log(`Execution time: ${executionTime}ms (expected: 900-3000ms for parallel execution)`);
 
-      // Verify parallel execution - should be close to the slowest function time
-      expect(executionTime).toBeLessThan(3000); // Should be less than 3 seconds if parallel (including overhead)
-      expect(executionTime).toBeGreaterThan(900); // Should be at least 900ms (slowest function)
+      expect(executionTime).toBeLessThan(3000);
+      expect(executionTime).toBeGreaterThan(900);
 
-      // Cleanup
       (testAgent as any).cleanup?.();
     }, 5000);
   });
