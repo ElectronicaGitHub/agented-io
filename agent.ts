@@ -130,6 +130,7 @@ export class Agent implements IAgent {
     this.prompt = agentSchema.prompt || '';
     this.splitPrompt = { cacheable: '', nonCacheable: '' };
     this.functions = agentSchema.functions || [];
+    this.marketplaceFunctions = agentSchema.marketplaceFunctions || [];
     this.functionsStoreService = agentSchema.functionsStoreService || {} as IFunctionsStoreService;
 
     this.llmProcessor = new LLMProcessor(
