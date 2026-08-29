@@ -8,5 +8,7 @@ export enum EAgentEvent {
   PING = 'ping',
   PONG = 'pong',
   REQUEST_LAST_RESPONSE = 'request_last_response',
-  LLM_STATUS_ERROR = 'llm_status_error'
+  LLM_STATUS_ERROR = 'llm_status_error',
+  LLM_STREAM = 'llm_stream',
+  LLM_TEXT_STREAM = 'llm_text_stream'
 }

@@ -1,13 +1,14 @@
 import { jsonrepair } from 'jsonrepair';
 import { saveJsonToFileAsync } from '../utils/file-utils';
 import { ELLMProvider, LAST_LLM_RESULT_RAW_FILENAME } from '../consts';
-import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions, ILLMUsageMetadata } from '../interfaces';
+import { ISimpleLLMConnector, ISplitPrompt, IEnvOptions, ILLMUsageMetadata, ILLMStreamOptions } from '../interfaces';
 import { AnthropicConnector } from '../llm-connectors/anthropic.connector';
 import { DeepSeekConnector } from '../llm-connectors/deepseek.connector';
 import { GrokConnector } from '../llm-connectors/grok.connector';
 import { OpenAIConnector } from '../llm-connectors/openai.connector';
-import { withTimeout } from '../utils/promise-utils';
+import { withAbortableTimeout } from '../utils/promise-utils';
 import { getEnvConfig } from '../utils/env-utils';
+import { v4 as uuidv4 } from 'uuid';
 
 export class LLMProcessor {
   private connectors: Partial<Record<ELLMProvider, ISimpleLLMConnector>>;
@@ -36,7 +37,8 @@ export class LLMProcessor {
     text: string | ISplitPrompt, 
     provider?: ELLMProvider, 
     model?: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onChunk?: (delta: string) => void,
   ): Promise<{
     result: string;
     httpStatus?: number;
@@ -49,7 +51,7 @@ export class LLMProcessor {
         throw new Error(`Unsupported provider: ${actualProvider}`);
       }
 
-      const response = await connector.sendChatMessage(text, model, signal);
+      const response = await connector.sendChatMessage(text, model, signal, onChunk);
       
       // Check if we need to call callback for this HTTP status
       if (response.httpStatus && this.getEnvConfigFn().statusesForEventRaise.includes(response.httpStatus)) {
@@ -79,12 +81,17 @@ export class LLMProcessor {
     }
   }
 
-  async getLLMResultSendMessage(message: string | ISplitPrompt, allowString: boolean = false, signal?: AbortSignal): Promise<{
+  async getLLMResultSendMessage(
+    message: string | ISplitPrompt,
+    allowString: boolean = false,
+    signal?: AbortSignal,
+    streamOptions?: ILLMStreamOptions,
+  ): Promise<{
     result: any;
     metadata: ILLMUsageMetadata;
   }> {
     try {
-      const result = await this.tryMultipleProvidersSendMessage(message, this.lastWorkingProvider, allowString, signal);
+      const result = await this.tryMultipleProvidersSendMessage(message, this.lastWorkingProvider, allowString, signal, streamOptions);
       return result;
     } catch (error) {
       console.error('Failed to get LLM result from all providers:', error);
@@ -96,7 +103,8 @@ export class LLMProcessor {
     message: string | ISplitPrompt, 
     startingProvider?: ELLMProvider,
     allowString: boolean = false,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    streamOptions?: ILLMStreamOptions,
   ): Promise<{
     result: string;
     metadata: ILLMUsageMetadata;
@@ -119,11 +127,58 @@ export class LLMProcessor {
     }
 
     for (const currentProvider of providersToTry) {
-      const [result, error, shouldStopRetry] = await this.tryLLMProviderSendMessage(currentProvider, message, allowString, signal);
+      if (signal?.aborted) throw this.abortError(signal);
+
+      const attemptId = uuidv4();
+      if (streamOptions) this.emitStreamEvent(streamOptions, {
+        phase: 'start',
+        streamId: streamOptions.streamId,
+        attemptId,
+        provider: currentProvider,
+      });
+
+      const [result, error, shouldStopRetry] = await this.tryLLMProviderSendMessage(
+        currentProvider,
+        message,
+        allowString,
+        signal,
+        streamOptions ? (delta) => this.emitStreamEvent(streamOptions, {
+          phase: 'delta',
+          streamId: streamOptions.streamId,
+          attemptId,
+          provider: currentProvider,
+          delta,
+        }) : undefined,
+      );
       if (!error && result) {
         this.lastWorkingProvider = currentProvider;
+        if (streamOptions) this.emitStreamEvent(streamOptions, {
+          phase: 'end',
+          streamId: streamOptions.streamId,
+          attemptId,
+          provider: currentProvider,
+          model: result.metadata?.modelUsed,
+        });
         return result;
       } else {
+        if (signal?.aborted) {
+          if (streamOptions) this.emitStreamEvent(streamOptions, {
+            phase: 'error',
+            streamId: streamOptions.streamId,
+            attemptId,
+            provider: currentProvider,
+            error: 'Request aborted',
+          });
+          throw this.abortError(signal);
+        }
+
+        if (streamOptions) this.emitStreamEvent(streamOptions, {
+          phase: 'reset',
+          streamId: streamOptions.streamId,
+          attemptId,
+          provider: currentProvider,
+          error: error?.message,
+        });
         console.warn(`[LLMProcessor] Provider ${currentProvider} failed:`, error?.message);
         // If we should stop retry (e.g., status in statusesForEventRaise), throw immediately
         if (shouldStopRetry) {
@@ -142,7 +197,8 @@ export class LLMProcessor {
     provider: ELLMProvider, 
     message: string | ISplitPrompt, 
     allowString: boolean = false,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onChunk?: (delta: string) => void,
   ): Promise<[any, Error | null, boolean]> {
     try {
       let originalLength: number;
@@ -180,11 +236,11 @@ export class LLMProcessor {
         throw new Error(`Unsupported provider: ${provider}`);
       }
 
-      const sendPromise = this.sendMessage(cleanedMessage, provider, undefined, signal);
-      const response = await withTimeout(
-        sendPromise,
+      const response = await withAbortableTimeout(
+        requestSignal => this.sendMessage(cleanedMessage, provider, undefined, requestSignal, onChunk),
         envConfig.LLM_RESULT_TIMEOUT_MS,
-        `LLM ${provider} request timeout`
+        `LLM ${provider} request timeout`,
+        signal,
       );
 
       // Check if we should stop retry due to status event
@@ -208,7 +264,9 @@ export class LLMProcessor {
       
       // Otherwise try to parse it as JSON
       try {
-        await saveJsonToFileAsync(LAST_LLM_RESULT_RAW_FILENAME, response.result);
+        if (envConfig.SAVE_LLM_RAW_RESPONSE) {
+          await saveJsonToFileAsync(LAST_LLM_RESULT_RAW_FILENAME, response.result);
+        }
         const parsedResponse = this.#parseJsonResponse(response.result, allowString);
         if (!parsedResponse) {
           throw new Error('Failed to parse JSON response');
@@ -227,6 +285,23 @@ export class LLMProcessor {
       const envConfig = this.getEnvConfigFn();
       const shouldStopRetry = error?.httpStatus && envConfig.statusesForEventRaise.includes(error.httpStatus);
       return [null, error as Error, shouldStopRetry || false];
+    }
+  }
+
+  private abortError(signal: AbortSignal): Error {
+    const error = new Error(typeof signal.reason === 'string' ? signal.reason : 'Request aborted');
+    error.name = 'AbortError';
+    return error;
+  }
+
+  private emitStreamEvent(
+    options: ILLMStreamOptions | undefined,
+    event: Parameters<NonNullable<ILLMStreamOptions['onEvent']>>[0],
+  ): void {
+    try {
+      options?.onEvent?.(event);
+    } catch (error) {
+      console.error('[LLMProcessor] Stream event listener failed:', error);
     }
   }
 

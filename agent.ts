@@ -7,6 +7,7 @@ import {
   DYNAMIC_PROMPT_SEPARATOR
   } from './consts';
 import { validateCustomPrompt } from './utils/prompt-validation';
+import { isValidAgentResponse } from './utils/agent-validation';
 import { 
   BASE_DECIDER_PROMPT_TEMPLATE,
   BASE_DECIDER_DYNAMIC_PROMPT_TEMPLATE,
@@ -46,6 +47,8 @@ import {
 } from './interfaces';
 import { IFunctionsStoreService } from './interfaces/functions-store-service.interface';
 import { createAgentFactory } from './utils/agent-factory';
+import { AgentTextStreamExtractor } from './utils/agent-text-stream-extractor';
+import { v4 as uuidv4 } from 'uuid';
 
 export type Middleware = (ctx: any) => Promise<void>;
 
@@ -358,6 +361,14 @@ export class Agent implements IAgent {
       this.emit(EAgentEvent.RESPONSE, response);
     });
 
+    // Bubble child streaming events to the root agent just like regular responses.
+    agent.on(EAgentEvent.LLM_STREAM, (event: any) => {
+      this.emit(EAgentEvent.LLM_STREAM, event);
+    });
+    agent.on(EAgentEvent.LLM_TEXT_STREAM, (event: any) => {
+      this.emit(EAgentEvent.LLM_TEXT_STREAM, event);
+    });
+
     await agent.init();
     return agent;
   }
@@ -471,6 +482,9 @@ export class Agent implements IAgent {
       );
 
       let retryCount = 0;
+      const streamId = uuidv4();
+      let lastStreamEvent: any;
+      const textStreamExtractor = new AgentTextStreamExtractor();
       let response: IAgentResponse | undefined;
       let metadata: ILLMUsageMetadata = {
         inputTokens: 0,
@@ -482,7 +496,30 @@ export class Agent implements IAgent {
 
       while (retryCount < this.maxRetries) {
         try {
-          const llmResult = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal);
+          const llmResult = await this.llmProcessor.getLLMResultSendMessage(this.splitPrompt, false, signal, {
+            streamId,
+            onEvent: event => {
+              lastStreamEvent = event;
+              this.emit(EAgentEvent.LLM_STREAM, {
+                ...event,
+                agentId: this.id,
+                agentName: this.name,
+              });
+
+              if (event.phase === 'reset') textStreamExtractor.reset();
+              const textDelta = event.phase === 'delta' && event.delta
+                ? textStreamExtractor.push(event.delta)
+                : undefined;
+              if (event.phase !== 'delta' || textDelta) {
+                this.emit(EAgentEvent.LLM_TEXT_STREAM, {
+                  ...event,
+                  delta: textDelta,
+                  agentId: this.id,
+                  agentName: this.name,
+                });
+              }
+            },
+          });
           const { result, metadata: llmMetadata } = llmResult;
           metadata = llmMetadata;
           
@@ -490,6 +527,23 @@ export class Agent implements IAgent {
           if (typeof result === 'string') {
             console.log(`[Agent ${this.name}] Invalid response format (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
             retryCount++;
+            this.emit(EAgentEvent.LLM_STREAM, {
+              ...lastStreamEvent,
+              phase: 'reset',
+              streamId,
+              agentId: this.id,
+              agentName: this.name,
+              error: 'Provider returned a string instead of an agent response',
+            });
+            textStreamExtractor.reset();
+            this.emit(EAgentEvent.LLM_TEXT_STREAM, {
+              ...lastStreamEvent,
+              phase: 'reset',
+              streamId,
+              agentId: this.id,
+              agentName: this.name,
+              error: 'Provider returned a string instead of an agent response',
+            });
             if (retryCount === this.maxRetries) {
               throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response was not an object.`);
             }
@@ -499,12 +553,29 @@ export class Agent implements IAgent {
             continue;
           }
 
-          // Validate unified response has actions array
-          if (!result.actions || !Array.isArray(result.actions)) {
-            console.log(`[Agent ${this.name}] Response missing actions array (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
+          // Runtime validation is required because provider JSON is untrusted.
+          if (!isValidAgentResponse(result)) {
+            console.log(`[Agent ${this.name}] Invalid unified response (attempt ${retryCount + 1}/${this.maxRetries}):`, result);
             retryCount++;
+            this.emit(EAgentEvent.LLM_STREAM, {
+              ...lastStreamEvent,
+              phase: 'reset',
+              streamId,
+              agentId: this.id,
+              agentName: this.name,
+              error: 'Provider returned an invalid agent response',
+            });
+            textStreamExtractor.reset();
+            this.emit(EAgentEvent.LLM_TEXT_STREAM, {
+              ...lastStreamEvent,
+              phase: 'reset',
+              streamId,
+              agentId: this.id,
+              agentName: this.name,
+              error: 'Provider returned an invalid agent response',
+            });
             if (retryCount === this.maxRetries) {
-              throw new Error(`Failed to get valid response after ${this.maxRetries} attempts. Response missing actions array.`);
+              throw new Error(`Failed to get valid agent response after ${this.maxRetries} attempts.`);
             }
             if (retryCount < this.maxRetries) {
               await new Promise(resolve => setTimeout(resolve, this.retryDelayMs));
