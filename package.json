@@ -1,6 +1,6 @@
 {
   "name": "agented-io",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "AI Agent Framework for building intelligent agents with LLM integration, function calling, and reflection capabilities",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,6 +42,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.33.1",
     "axios": "^1.7.9",
+    "dotenv": "^16.6.1",
     "jsonrepair": "^3.11.2",
     "node-schedule": "^2.1.1",
     "openai": "^4.77.0",
