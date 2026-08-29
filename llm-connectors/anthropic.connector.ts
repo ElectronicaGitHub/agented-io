@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { TextBlock } from '@anthropic-ai/sdk/resources';
-import { ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
+import { ILLMChunkHandler, ILLMResultResponse, ISimpleLLMConnector, ISplitPrompt, IEnvOptions } from '../interfaces';
 
 export class AnthropicConnector implements ISimpleLLMConnector {
   private client: Anthropic;
@@ -14,7 +14,7 @@ export class AnthropicConnector implements ISimpleLLMConnector {
     });
   }
 
-  async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal): Promise<ILLMResultResponse> {
+  async sendChatMessage(prompt: string | ISplitPrompt, model?: string, signal?: AbortSignal, onChunk?: ILLMChunkHandler): Promise<ILLMResultResponse> {
     const envConfig = this.getEnvConfig();
     const actualModel = model || envConfig.ANTHROPIC_MODEL;
     this.client.apiKey = envConfig.ANTHROPIC_API_KEY;
@@ -25,37 +25,33 @@ export class AnthropicConnector implements ISimpleLLMConnector {
       console.log('[Anthropic Connector] split prompt', prompt.cacheable.length, prompt.nonCacheable.length);
     }
     try {
-      let response: any;
-      if (typeof prompt === 'string') {
-        response = await this.client.messages.create({
+      const request: any = typeof prompt === 'string'
+        ? {
           model: actualModel,
           max_tokens: 4000,
-          system: [
-            {
-              type: 'text',
-              text: prompt,
-              cache_control: { type: 'ephemeral' }
-            }
-          ],
           messages: [{ role: 'user', content: prompt }],
-        }, { signal });
-      } else {
-        response = await this.client.messages.create({
+        }
+        : {
           model: actualModel,
           max_tokens: 4000,
-          system: [
-            {
-              type: 'text',
-              text: prompt.cacheable,
-              cache_control: { type: 'ephemeral' }
-            }
-          ],
+          system: [{ type: 'text', text: prompt.cacheable, cache_control: { type: 'ephemeral' } }],
           messages: [{ role: 'user', content: prompt.nonCacheable }],
-        }, { signal });
+        };
+
+      let response: any;
+      if (onChunk) {
+        const stream = this.client.messages.stream(request, { signal });
+        stream.on('text', (delta: string) => onChunk(delta));
+        response = await stream.finalMessage();
+      } else {
+        response = await this.client.messages.create(request, { signal });
       }
       console.log('[Anthropic Connector] response.usage', response.usage);
       
-      const textResult = (response.content[0] as TextBlock).text;
+      const textResult = response.content
+        .filter((block: any): block is TextBlock => block.type === 'text')
+        .map((block: TextBlock) => block.text)
+        .join('');
 
       // Extract usage metadata
       const usage = response.usage;
@@ -73,9 +69,7 @@ export class AnthropicConnector implements ISimpleLLMConnector {
 
       return { result: textResult, metadata };
     } catch (error: any) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return { error: 'Request aborted' };
-      }
+      if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error;
       
       // Extract HTTP status from error if available
       const httpStatus = error?.status || error?.response?.status;

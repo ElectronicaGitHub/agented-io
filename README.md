@@ -542,6 +542,31 @@ const functions = [
 ];
 ```
 
+## Streaming LLM responses
+
+Anthropic and DeepSeek responses are streamed while the complete response is
+still buffered and validated before actions execute. Listen on the root agent:
+
+```typescript
+topAgent.on(EAgentEvent.LLM_TEXT_STREAM, event => {
+  // start | delta | reset | end | error
+  console.log(event.phase, event.streamId, event.attemptId, event.delta);
+});
+```
+
+`LLM_TEXT_STREAM` contains only text from `actions[type=text].text` and is safe
+to forward to a UI. `LLM_STREAM` contains the raw provider JSON stream and must
+not be exposed to users because it may include function parameters and internal
+agent instructions.
+
+Use `streamId` to identify one logical agent request and `attemptId` to
+distinguish retries or fallback providers. On `reset`, discard provisional text
+for that stream. Timeouts and external aborts cancel the active provider request;
+an explicit abort does not start a fallback provider.
+
+Raw LLM responses are no longer written to disk by default. Set
+`SAVE_LLM_RAW_RESPONSE: true` only for local debugging.
+
 ## License
 
 MIT

@@ -6,3 +6,4 @@ export * from './promise-utils';
 export * from './prompt-polyfill';
 export * from './simple-queue';
 export * from './env-utils';
+export * from './agent-text-stream-extractor';

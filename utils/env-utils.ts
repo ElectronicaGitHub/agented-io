@@ -75,6 +75,7 @@ export function getEnvConfig(envOptions?: IEnvOptions): Required<IEnvOptions> {
     // Debug Settings
     LOG_PROMPT: getEnvValue('LOG_PROMPT', envOptions, false),
     LOG_RESPONSE: getEnvValue('LOG_RESPONSE', envOptions, false),
+    SAVE_LLM_RAW_RESPONSE: getEnvValue('SAVE_LLM_RAW_RESPONSE', envOptions, false),
     
     // HTTP Status Event Settings
     statusesForEventRaise: getEnvValue('statusesForEventRaise', envOptions, []),
